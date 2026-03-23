@@ -2,8 +2,6 @@
 
 This project is a tenant portal and admin console built with Express and SQLite.
 
-Current release channel: `0.1.0-beta.1`
-
 It includes:
 - a tenant-facing portal for payments, messages, alerts, maintenance, notices, leases, documents, and profile updates
 - a separate admin login and admin console for tenant management and operations
@@ -142,23 +140,6 @@ Suggested deploy flow:
 5. After the first deploy, connect your custom domain in Render and update `APP_BASE_URL` to that exact HTTPS URL.
 
 The included blueprint assumes the `frankfurt` region as a reasonable default for East Africa, but you can change that before the first deploy if you prefer another region.
-
-## Beta release workflow
-
-This project can now be run as a live beta while we continue shipping updates.
-
-- Use `main` as the live beta branch.
-- Build changes in feature branches, then open pull requests into `main`.
-- GitHub Actions now runs the validation suite automatically for pushes and pull requests.
-- Render should deploy from `main` after merges.
-- Tag beta versions in Git as `v0.1.0-beta.x`.
-- Pushing a `v*` tag creates a GitHub release automatically.
-
-Detailed steps are in:
-
-```text
-docs/beta-release.md
-```
 
 ## Docker
 

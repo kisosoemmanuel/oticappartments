@@ -200,9 +200,9 @@ function renderLogin(status = "") {
           <img src="./brand.png" alt="Otic Apartments" />
         </div>
         <div>
-          <div class="eyebrow">Tenant Portal Beta</div>
+          <div class="eyebrow">Tenant Portal</div>
           <h1>One place for your rent, notices, messages, and move-out requests.</h1>
-          <p>Sign in with your first name and account number to manage payments, maintenance, documents, lease details, and system messages during the beta release.</p>
+          <p>Sign in with your first name and account number to manage payments, maintenance, documents, lease details, and system messages.</p>
         </div>
         <div class="muted">Use the tenant credentials your administrator created for you.</div>
       </section>
@@ -279,7 +279,6 @@ async function renderDashboard() {
             <p id="welcomeCopy">Loading your account...</p>
           </div>
           <div class="actions">
-            <div class="eyebrow" style="background:#fff4d6;color:#7c4a00;">Live Beta</div>
             <button class="button secondary" id="refreshBtn">Refresh</button>
           </div>
         </div>

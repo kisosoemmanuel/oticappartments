@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: otic-apartments-beta
+    name: otic-apartments
     runtime: node
     plan: starter
     region: frankfurt

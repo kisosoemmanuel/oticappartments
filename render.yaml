@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: otic-apartments
+    name: otic-apartments-beta
     runtime: node
     plan: starter
     region: frankfurt
     numInstances: 1
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /api/health

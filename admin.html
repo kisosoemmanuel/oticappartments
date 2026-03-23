@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin - Otic Apartments</title>
+<style>
+:root{--bg:#f3f6fb;--panel:#ffffff;--panel-soft:#eef4ff;--text:#16324f;--muted:#5f7388;--border:#d9e4f2;--accent:#1d4ed8;--accent-strong:#1e40af;--success:#0f766e;--success-soft:#e8fbf5;--warning:#b45309;--warning-soft:#fff5e6;--danger:#b91c1c;--danger-soft:#fff1f2;--shadow:0 20px 50px rgba(22,50,79,.12)}
+*{box-sizing:border-box}
+body{margin:0;font-family:Georgia,"Segoe UI",serif;background:radial-gradient(circle at top left,rgba(29,78,216,.10),transparent 35%),linear-gradient(180deg,#f9fbff 0%,var(--bg) 100%);color:var(--text)}
+button,input,select,textarea{font:inherit}
+.app{display:grid;grid-template-columns:268px 1fr;min-height:100vh}
+.sidebar{background:#13263d;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:24px;overflow:auto}
+.brand{width:fit-content;padding:14px 18px;border-radius:20px;background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.2)}
+.brand img{width:170px;max-width:100%;display:block}
+#identity{color:rgba(255,255,255,.8);line-height:1.5}
+.nav{display:grid;gap:10px}
+.nav button,.btn{border:0;border-radius:14px;padding:12px 16px;cursor:pointer}
+.nav button{background:transparent;color:rgba(255,255,255,.82);text-align:left}
+.nav button.active,.nav button:hover{background:rgba(255,255,255,.12);color:#fff}
+.main{padding:28px}
+.topbar{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:24px}
+.topbar h1{margin:8px 0 0;font-size:40px;line-height:1}
+.page-copy{margin:10px 0 0;color:var(--muted);max-width:720px}
+.btn{background:var(--accent);color:#fff;transition:transform .12s ease,background .12s ease}
+.btn:hover{background:var(--accent-strong);transform:translateY(-1px)}
+.btn.secondary{background:#e7eefb;color:var(--text)}
+.btn.secondary:hover{background:#d8e4fb}
+.btn.success{background:var(--success)}
+.btn.success:hover{background:#0d5f59}
+.btn.warning{background:#fbbf24;color:#3f2a00}
+.btn.warning:hover{background:#f59e0b}
+.btn.danger{background:#dc2626}
+.btn.danger:hover{background:#b91c1c}
+.status{min-height:24px;margin-bottom:14px;color:var(--muted);font-size:14px}
+.status.error{color:var(--danger)}
+.status.success{color:var(--success)}
+.hidden{display:none}
+.grid{display:grid;gap:18px}
+.stats{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.three{display:grid;grid-template-columns:1.15fr .85fr .95fr;gap:18px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:22px;box-shadow:var(--shadow)}
+.title{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+.value{font-size:32px;line-height:1.1}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+label{display:block;margin-bottom:6px;color:var(--muted);font-size:14px}
+input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(29,78,216,.18);border-color:var(--accent)}
+textarea{min-height:120px;resize:vertical}
+.list,.stack{display:grid;gap:14px}
+.item{background:#f8fbff;border:1px solid #e3edf8;border-radius:18px;padding:16px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+.pill{display:inline-flex;width:fit-content;padding:7px 12px;border-radius:999px;background:var(--panel-soft);color:#163ea8;font-size:12px;letter-spacing:.03em}
+.pill.status-pending,.pill.status-pending-confirmation{background:var(--warning-soft);color:var(--warning)}
+.pill.status-in-progress{background:#fff3cd;color:#9a6700}
+.pill.status-resolved,.pill.status-solved,.pill.status-approved,.pill.status-completed{background:var(--success-soft);color:var(--success)}
+.pill.status-disapproved{background:var(--danger-soft);color:var(--danger)}
+.selection-summary{margin:0;color:var(--muted);font-size:13px}
+.selection-list{max-height:290px;overflow:auto;padding-right:4px}
+.check-item{display:flex;gap:12px;align-items:flex-start}
+.check-item input[type="checkbox"]{width:18px;height:18px;margin:2px 0 0}
+.tenant-detail-shell{display:grid;gap:18px}
+.detail-hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.detail-section .item{background:#fff}
+.record-list{display:grid;gap:12px}
+.section-heading{margin:0 0 14px;font-size:18px}
+.item.ticket-pending{border-color:#f4c985;background:#fffbf2}
+.item.ticket-in-progress{border-color:#f7d774;background:#fff8dd}
+.item.ticket-resolved,.item.ticket-solved{border-color:#9fddc4;background:#f2fcf7}
+.item.payment-pending-confirmation{border-color:#f1c987;background:#fffbf3}
+.item.payment-approved{border-color:#9fddc4;background:#f2fcf7}
+.item.payment-disapproved{border-color:#f2a8b5;background:#fff5f7}
+#overviewStats .panel{background:linear-gradient(180deg,var(--panel-soft),#fff)}
+@media (max-width:1100px){.app,.three,.split,.detail-grid{grid-template-columns:1fr}.main{padding:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="brand"><img src="/brand.png" alt="Otic Apartments" /></div>
+<div id="identity">Checking session...</div>
+<nav class="nav">
+<button class="active" data-tab="overview">Overview</button>
+<button data-tab="tenants">Tenants</button>
+<button data-tab="documents">Documents</button>
+<button data-tab="messages">Messages</button>
+<button data-tab="notices">Vacating Notices</button>
+<button data-tab="tickets">Tickets</button>
+<button data-tab="payments">Payments</button>
+</nav>
+<button class="btn danger" id="logoutBtn" type="button">Log out</button>
+</aside>
+<main class="main">
+<div class="topbar"><div><div class="pill">Private Admin</div><h1>Admin Console</h1><p class="page-copy">Manage tenants, messages, notices, tickets, payments, and occupancy from one private workspace.</p></div><button class="btn secondary" id="refreshAllBtn" type="button">Refresh</button></div>
+<div id="status" class="status"></div>
+<section id="tab-overview" class="grid">
+<div class="grid stats" id="overviewStats"></div>
+<div class="split"><section class="panel"><h2 class="title">Action Queue</h2><div id="actionQueue" class="list"></div></section><section class="panel"><h2 class="title">Occupancy Control</h2><form id="occupancyForm" class="stack"><div class="filters"><div><label for="occupiedUnitsInput">Occupied Units</label><input id="occupiedUnitsInput" type="number" min="0" step="1" /></div><div><label for="vacantUnitsInput">Vacant Units</label><input id="vacantUnitsInput" type="number" min="0" step="1" /></div></div><button class="btn" type="submit">Save Occupancy</button></form></section></div>
+</section>
+<section id="tab-tenants" class="hidden"><div id="tenantListView" class="three"><section class="panel"><h2 class="title">Tenant Filters</h2><div class="filters"><div><label for="tenantFloorFilter">Floor</label><select id="tenantFloorFilter"></select></div><div><label for="tenantSearch">Search</label><input id="tenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div id="tenantCards" class="list"></div></section><section class="panel"><h2 class="title">Quick Preview</h2><div id="tenantPreview" class="list"><div class="item">Choose a tenant to preview their record.</div></div></section><section class="panel"><h2 class="title">Create Tenant</h2><form id="createUserForm" class="stack"><div class="filters"><div><label for="firstName">First name</label><input id="firstName" /></div><div><label for="lastName">Last name</label><input id="lastName" /></div><div><label for="accountNumber">Account number</label><input id="accountNumber" /></div><div><label for="floorNumber">Floor number</label><input id="floorNumber" /></div><div><label for="houseNumber">Unit / house number</label><input id="houseNumber" /></div><div><label for="phoneNumber">Phone</label><input id="phoneNumber" /></div><div><label for="rent">Rent</label><input id="rent" /></div><div><label for="accountBalance">Account balance</label><input id="accountBalance" /></div><div><label for="arrears">Arrears</label><input id="arrears" /></div></div><button class="btn" type="submit">Create user</button></form></section></div></section>
+<section id="tab-tenant-detail" class="hidden"><div class="toolbar" style="justify-content:space-between;margin-bottom:14px;"><button class="btn secondary" id="backToTenantsBtn" type="button">Back to Tenants</button><span class="pill">Tenant Record</span></div><div id="tenantDetail"></div></section>
+<section id="tab-documents" class="hidden"><div class="split"><section class="panel"><h2 class="title">Upload Shared Document</h2><form id="sharedDocumentForm" class="stack"><div class="filters"><div><label for="sharedDocumentName">Document name</label><input id="sharedDocumentName" placeholder="e.g. House Rules" /></div><div><label for="sharedDocumentCategory">Category</label><input id="sharedDocumentCategory" value="General" /></div></div><div><label for="sharedDocumentStatus">Status</label><select id="sharedDocumentStatus"><option value="AVAILABLE">Available</option><option value="REQUIRED">Required</option><option value="IMPORTANT">Important</option></select></div><div><label for="sharedDocumentFile">File</label><input id="sharedDocumentFile" type="file" /></div><button class="btn" type="submit">Upload For All Tenants</button></form></section><section class="panel"><div class="toolbar" style="justify-content:space-between;"><h2 class="title" style="margin:0;">Published Documents</h2><span class="pill">Visible To Every Tenant</span></div><div id="documentList" class="list" style="margin-top:14px;"></div></section></div></section>
+<section id="tab-messages" class="hidden"><div class="split"><section class="panel"><h2 class="title">All Messages</h2><div class="filters"><div><label for="messageSenderFilter">Sender type</label><select id="messageSenderFilter"><option value="">All senders</option><option value="TENANT">Tenant</option><option value="ADMIN">Admin</option><option value="SYSTEM">System</option></select></div><div><label for="messageSearch">Search</label><input id="messageSearch" placeholder="Tenant, subject, category, body" /></div></div><div id="messageList" class="list"></div></section><section class="panel"><h2 class="title">Send Message</h2><form id="sendMessageForm" class="stack"><div><label for="messageTenant">Tenant</label><select id="messageTenant"></select></div><div class="filters"><div><label for="messageSender">Sender name</label><input id="messageSender" value="Davies Muchai" /></div><div><label for="messageCategory">Category</label><input id="messageCategory" value="Billing" /></div></div><div><label for="messageSubject">Subject</label><input id="messageSubject" /></div><div><label for="messageBody">Message body</label><textarea id="messageBody"></textarea></div><button class="btn" type="submit">Send message</button></form><div class="toolbar" style="margin-top:14px;"><button class="btn secondary" id="loadMessagesBtn" type="button">Load conversation</button></div><div id="messageThread" class="list" style="margin-top:14px;"></div></section></div></section>
+<section id="tab-notices" class="hidden"><section class="panel"><h2 class="title">Vacating Notices</h2><div class="filters"><div><label for="noticeSearch">Search</label><input id="noticeSearch" placeholder="Tenant, unit, property" /></div><div><label for="noticeStatusFilter">Status</label><select id="noticeStatusFilter"><option value="">All statuses</option><option value="Pending">Pending</option><option value="APPROVED">Approved</option><option value="DISAPPROVED">Disapproved</option></select></div></div><div id="noticeList" class="list"></div></section></section>
+<section id="tab-tickets" class="hidden"><section class="panel"><h2 class="title">Tickets</h2><div class="filters"><div><label for="ticketSearch">Search</label><input id="ticketSearch" placeholder="Tenant, title, status" /></div><div><label for="ticketStatusFilter">Status</label><select id="ticketStatusFilter"><option value="">All open tickets</option><option value="Pending">Pending</option><option value="In Progress">In Progress</option></select></div></div><div id="ticketList" class="list"></div></section></section>
+<section id="tab-payments" class="hidden"><div class="split"><section class="panel"><h2 class="title">Payment Controls</h2><div class="grid stats" id="paymentStats"></div><form id="paymentTargetsForm" class="stack" style="margin-top:14px;"><div class="filters"><div><label for="expectedCollection">Expected amount required</label><input id="expectedCollection" type="number" min="0" step="0.01" /></div><div><label for="acquiredCollection">Acquired amount from all tenants</label><input id="acquiredCollection" type="number" min="0" step="0.01" /></div></div><button class="btn" type="submit">Save totals</button></form><form id="billingConfigForm" class="stack" style="margin-top:14px;"><div class="filters"><div><label for="billingRent">Rent</label><input id="billingRent" type="number" min="0" step="0.01" /></div><div><label for="billingWater">Water Bill</label><input id="billingWater" type="number" min="0" step="0.01" /></div><div><label for="billingTrash">Trash Bill</label><input id="billingTrash" type="number" min="0" step="0.01" /></div><div><label for="billingElectricity">Electricity Bill</label><input id="billingElectricity" type="number" min="0" step="0.01" /></div></div><div><div class="toolbar" style="justify-content:space-between;margin-bottom:10px;"><h3 class="section-heading" style="margin:0;font-size:16px;">Apply Bills To</h3><p id="billingSelectionSummary" class="selection-summary"></p></div><div class="filters"><div><label for="billingTenantSearch">Search tenants</label><input id="billingTenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div class="toolbar" style="margin-bottom:10px;"><button class="btn secondary" id="selectAllBillingTenantsBtn" type="button">Select All</button><button class="btn secondary" id="clearBillingTenantsBtn" type="button">Clear</button></div><div id="billingTenantSelection" class="list selection-list"></div></div><button class="btn secondary" type="submit">Apply bill values to selected tenants</button></form></section><section class="panel"><h2 class="title">Payment Feed</h2><div class="filters"><div><label for="paymentStatusFilter">Status</label><select id="paymentStatusFilter"><option value="">All statuses</option><option value="PENDING_CONFIRMATION">Pending confirmation</option><option value="APPROVED">Approved</option><option value="DISAPPROVED">Disapproved</option><option value="COMPLETED">Completed</option></select></div><div><label for="paymentSearch">Search</label><input id="paymentSearch" placeholder="Tenant, unit, reference, phone" /></div></div><div id="paymentList" class="list"></div></section></div></section>
+</main>
+</div>
+<script>
+const state = {
+  overview: null,
+  users: [],
+  messages: [],
+  notices: [],
+  tickets: [],
+  payments: { summary: {}, billing: {}, payments: [] },
+  documents: [],
+  tenantDetail: null,
+  billingSelection: [],
+  billingSelectionInitialized: false,
+};
+
+const statusEl = document.getElementById("status");
+const identityEl = document.getElementById("identity");
+const AUTO_REFRESH_INTERVAL_MS = 10000;
+let adminAutoRefreshTimer = null;
+let loadAllDataPromise = null;
+
+const esc = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+const money = (value) =>
+  `KES ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function setStatus(text, isError) {
+  statusEl.textContent = text;
+  statusEl.className = `status ${isError ? "error" : "success"}`;
+}
+
+function humanizeStatus(value) {
+  return String(value || "")
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function ticketStatusValue(status) {
+  const normalized = String(status || "").trim();
+  return normalized === "Resolved" ? "Solved" : normalized || "Pending";
+}
+
+function isTicketOpen(status) {
+  return !["Resolved", "Solved"].includes(String(status || "").trim());
+}
+
+function paymentNeedsReview(payment) {
+  return String(payment?.status || "").trim().toUpperCase() === "PENDING_CONFIRMATION";
+}
+
+function noticeNeedsReview(notice) {
+  return String(notice?.status || "").trim() === "Pending";
+}
+
+function statusClass(value) {
+  return (
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-") || "default"
+  );
+}
+
+function formatDate(value) {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatDateTime(value) {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+}
+
+function renderStatusPill(value, label = value) {
+  return `<span class="pill status-${statusClass(value)}">${esc(label)}</span>`;
+}
+
+function renderRecordCollection(items, emptyMessage) {
+  if (!items.length) {
+    return `<div class="item">${esc(emptyMessage)}</div>`;
+  }
+  return `<div class="record-list">${items.join("")}</div>`;
+}
+
+function shouldPauseAutoRefresh() {
+  const active = document.activeElement;
+  if (!active) return false;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName) && !active.readOnly && !active.disabled;
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (response.status === 401) {
+    window.location.href = "/secure-admin/login";
+    throw new Error("Admin session expired");
+  }
+
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("application/json")) {
+    throw new Error(`Expected JSON from ${url}`);
+  }
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed for ${url}`);
+  }
+
+  return data;
+}
+
+async function ensureSession() {
+  const data = await fetchJson("/api/admin/session");
+  identityEl.textContent = `Signed in as ${data.username || "Admin"}`;
+}
+
+function switchTab(tab) {
+  const activeTab = tab === "tenant-detail" ? "tenants" : tab;
+  document.querySelectorAll(".nav button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === activeTab);
+  });
+  document.querySelectorAll('[id^="tab-"]').forEach((section) => section.classList.add("hidden"));
+  const target = document.getElementById(`tab-${tab}`);
+  if (target) {
+    target.classList.remove("hidden");
+  }
+}
+
+function getVisibleTenantDetailId() {
+  const detailTab = document.getElementById("tab-tenant-detail");
+  if (!detailTab || detailTab.classList.contains("hidden")) return null;
+  return state.tenantDetail?.tenant?.tenant_id || null;
+}
+
+function syncBillingSelection() {
+  const available = new Set(state.users.map((user) => user.tenant_id).filter(Boolean));
+  if (!state.billingSelectionInitialized) {
+    state.billingSelection = state.users.map((user) => user.tenant_id).filter(Boolean);
+    state.billingSelectionInitialized = true;
+    return;
+  }
+
+  state.billingSelection = state.billingSelection.filter((tenantId) => available.has(tenantId));
+}
+
+function setBillingSelection(tenantIds) {
+  const available = new Set(state.users.map((user) => user.tenant_id).filter(Boolean));
+  state.billingSelection = [...new Set(tenantIds.filter((tenantId) => available.has(tenantId)))];
+  state.billingSelectionInitialized = true;
+  renderBillingTenantSelection();
+}
+
+function fillFloorSelect() {
+  const select = document.getElementById("tenantFloorFilter");
+  const current = select.value;
+  const floors = [...new Set(state.users.map((user) => user.floor_number).filter(Boolean))].sort();
+  select.innerHTML =
+    '<option value="">All floors</option>' +
+    floors.map((floor) => `<option value="${esc(floor)}">${esc(floor)}</option>`).join("");
+  if (floors.includes(current)) {
+    select.value = current;
+  }
+}
+
+function renderOverview() {
+  const stats = state.overview?.stats || {};
+  const portfolio = state.overview?.overview || {};
+
+  document.getElementById("overviewStats").innerHTML = [
+    ["Total Tenants", stats.total_users || 0],
+    ["Messages", state.messages.length || 0],
+    ["Pending Notices", state.notices.filter((notice) => notice.status === "Pending").length],
+    ["Open Tickets", state.tickets.filter((ticket) => isTicketOpen(ticket.status)).length],
+    ["Occupied Units", portfolio.occupied_units || 0],
+    ["Vacant Units", portfolio.vacant_units || 0],
+  ]
+    .map(
+      ([label, value]) =>
+        `<article class="panel"><div class="title">${esc(label)}</div><div class="value">${esc(value)}</div></article>`
+    )
+    .join("");
+
+  document.getElementById("actionQueue").innerHTML = [
+    ["Pending payment reviews", (state.payments.payments || []).filter((payment) => paymentNeedsReview(payment)).length],
+    ["Pending vacating notices", state.notices.filter((notice) => notice.status === "Pending").length],
+    ["Open tickets", state.tickets.filter((ticket) => isTicketOpen(ticket.status)).length],
+  ]
+    .map(
+      ([label, value]) =>
+        `<div class="item"><strong>${esc(label)}</strong><div class="muted">${esc(value)}</div></div>`
+    )
+    .join("");
+
+  document.getElementById("occupiedUnitsInput").value = Number(portfolio.occupied_units || 0);
+  document.getElementById("vacantUnitsInput").value = Number(portfolio.vacant_units || 0);
+}
+function renderTenantOptions() {
+  const select = document.getElementById("messageTenant");
+  const current = select.value;
+  if (!state.users.length) {
+    select.innerHTML = '<option value="">No tenants available</option>';
+    return;
+  }
+
+  select.innerHTML = state.users
+    .map((user) => {
+      const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
+      return `<option value="${esc(user.tenant_id)}">${esc(tenantName)}</option>`;
+    })
+    .join("");
+
+  const tenantIds = state.users.map((user) => user.tenant_id);
+  select.value = tenantIds.includes(current) ? current : tenantIds[0];
+}
+
+function filteredTenants() {
+  const floor = document.getElementById("tenantFloorFilter").value;
+  const search = document.getElementById("tenantSearch").value.trim().toLowerCase();
+
+  return state.users.filter((user) => {
+    const matchesFloor = !floor || String(user.floor_number || "") === String(floor);
+    const matchesSearch =
+      !search ||
+      `${user.first_name || ""} ${user.last_name || ""} ${user.tenant_id || ""} ${user.house_number || ""}`
+        .toLowerCase()
+        .includes(search);
+    return matchesFloor && matchesSearch;
+  });
+}
+
+function renderTenants() {
+  const users = filteredTenants();
+  document.getElementById("tenantCards").innerHTML =
+    users
+      .map((user) => {
+        const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
+        return `<article class="item">
+          <div class="toolbar">
+            <strong>${esc(tenantName)}</strong>
+            <span class="pill">Floor ${esc(user.floor_number || "-")}</span>
+          </div>
+          <div class="muted">Tenant ID: ${esc(user.tenant_id || "-")}</div>
+          <div class="muted">Unit ${esc(user.house_number || "-")} | Phone ${esc(user.phone_number || "-")}</div>
+          <div class="muted">Balance ${esc(money(user.account_balance || 0))} | Arrears ${esc(money(user.arrears || 0))}</div>
+          <div class="toolbar" style="margin-top:10px;">
+            <button class="btn secondary openTenantBtn" data-tenant="${esc(user.tenant_id)}" type="button">Open Record</button>
+            <button class="btn danger deleteBtn" data-tenant="${esc(user.tenant_id)}" type="button">Delete</button>
+          </div>
+        </article>`;
+      })
+      .join("") || '<div class="item">No tenants match the current filter.</div>';
+
+  const first = users[0];
+  document.getElementById("tenantPreview").innerHTML = first
+    ? `<div class="item">
+        <strong>${esc(`${first.first_name || ""} ${first.last_name || ""}`.trim() || first.tenant_id)}</strong>
+        <div class="muted">Tenant ID: ${esc(first.tenant_id || "-")}</div>
+        <div class="muted">Floor ${esc(first.floor_number || "-")} | Unit ${esc(first.house_number || "-")}</div>
+      </div>`
+    : '<div class="item">Choose a tenant to preview their record.</div>';
+}
+
+function renderTenantDetail() {
+  const detail = state.tenantDetail;
+  if (!detail) {
+    document.getElementById("tenantDetail").innerHTML = "";
+    return;
+  }
+
+  const tenant = detail.tenant || {};
+  const bills = detail.bills || {};
+  const lease = detail.lease || null;
+  const recentPayments = (detail.payments || []).slice(0, 5);
+  const recentTickets = (detail.maintenance || []).slice(0, 5);
+  const recentMessages = (detail.messages || []).slice(0, 5);
+  const recentTransactions = (detail.transactions || []).slice(0, 5);
+  const recentNotices = (detail.notices || []).slice(0, 4);
+  const recentArrears = (detail.arrears || []).slice(0, 4);
+  const tenantName = `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || "Tenant";
+
+  document.getElementById("tenantDetail").innerHTML = `
+    <div class="tenant-detail-shell">
+      <section class="panel">
+        <div class="detail-hero">
+          <div>
+            <div class="pill">Full Record</div>
+            <h2 style="margin:12px 0 8px;font-size:34px;">${esc(tenantName)}</h2>
+            <div class="muted">Tenant ID: ${esc(tenant.tenant_id || "-")}</div>
+            <div class="muted">Property: ${esc(tenant.property_name || "-")} | Floor ${esc(tenant.floor_number || "-")} | Unit ${esc(tenant.house_number || "-")}</div>
+            <div class="muted">Phone: ${esc(tenant.phone_number || "-")} | Joined ${esc(formatDate(tenant.date_created || tenant.created_at))}</div>
+          </div>
+          <div class="item">
+            <div class="title">Balance Snapshot</div>
+            <div class="value">${esc(money(tenant.account_balance || 0))}</div>
+            <div class="muted">Arrears: ${esc(money(tenant.arrears || 0))}</div>
+            <div class="muted">Current bill total: ${esc(money(bills.total || 0))}</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid stats">
+        ${[
+          ["Unread Messages", detail.summary?.unread_messages || 0],
+          ["Open Tickets", detail.summary?.open_tickets || 0],
+          ["Pending Notices", detail.summary?.pending_notices || 0],
+          ["Pending Payments", detail.summary?.pending_payments || 0],
+        ]
+          .map(
+            ([label, value]) =>
+              `<article class="panel"><div class="title">${esc(label)}</div><div class="value">${esc(value)}</div></article>`
+          )
+          .join("")}
+      </div>
+
+      <div class="detail-grid">
+        <section class="panel detail-section">
+          <h3 class="section-heading">Account Summary</h3>
+          <div class="list">
+            <article class="item">
+              <strong>Bill Breakdown</strong>
+              <div class="muted" style="margin-top:10px;">Rent: ${esc(money(bills.rent || 0))}</div>
+              <div class="muted">Water: ${esc(money(bills.water || 0))}</div>
+              <div class="muted">Trash: ${esc(money(bills.trash || 0))}</div>
+              <div class="muted">Electricity: ${esc(money(bills.electricity || 0))}</div>
+            </article>
+            <article class="item">
+              <strong>Lease Snapshot</strong>
+              ${
+                lease
+                  ? `<div class="muted" style="margin-top:10px;">${esc(lease.lease_name || "Active lease")}</div>
+                     <div class="muted">Start: ${esc(formatDate(lease.start_date))}</div>
+                     <div class="muted">End: ${esc(formatDate(lease.end_date))}</div>
+                     <div class="muted">Monthly rent: ${esc(money(lease.monthly_rent || bills.rent || 0))}</div>`
+                  : '<div class="muted" style="margin-top:10px;">No active lease is recorded for this tenant.</div>'
+              }
+            </article>
+          </div>
+        </section>
+
+        <section class="panel detail-section">
+          <h3 class="section-heading">Recent Payments</h3>
+          ${renderRecordCollection(
+            recentPayments.map((payment) => {
+              const label = humanizeStatus(payment.status || "PENDING_CONFIRMATION");
+              return `<article class="item payment-${statusClass(payment.status)}">
+                <div class="toolbar">
+                  <strong>${esc(money(payment.amount || 0))}</strong>
+                  ${renderStatusPill(payment.status || "PENDING_CONFIRMATION", label)}
+                </div>
+                <div class="muted">${esc(payment.payment_for || "RENT")} | ${esc(payment.method || "-")}</div>
+                <div class="muted">Reference: ${esc(payment.reference || "-")} | Submitted ${esc(formatDateTime(payment.created_at))}</div>
+              </article>`;
+            }),
+            "No payments recorded for this tenant yet."
+          )}
+        </section>
+      </div>
+
+      <div class="detail-grid">
+        <section class="panel detail-section">
+          <h3 class="section-heading">Maintenance</h3>
+          ${renderRecordCollection(
+            recentTickets.map((ticket) => {
+              const label = ticketStatusValue(ticket.status);
+              return `<article class="item ticket-${statusClass(label)}">
+                <div class="toolbar">
+                  <strong>${esc(ticket.title || "Ticket")}</strong>
+                  ${renderStatusPill(label)}
+                </div>
+                <div>${esc(ticket.description || "No details provided.")}</div>
+                <div class="muted">Updated ${esc(formatDateTime(ticket.updated_at))}</div>
+              </article>`;
+            }),
+            "No maintenance tickets logged for this tenant."
+          )}
+        </section>
+
+        <section class="panel detail-section">
+          <h3 class="section-heading">Messages</h3>
+          ${renderRecordCollection(
+            recentMessages.map((message) => {
+              const sender = `${message.sender_name || ""}`.trim() || message.sender_type || "System";
+              return `<article class="item">
+                <div class="toolbar">
+                  <strong>${esc(message.subject || "Message")}</strong>
+                  <span class="pill">${esc(message.sender_type || "SYSTEM")}</span>
+                </div>
+                <div class="muted">${esc(sender)} | ${esc(formatDateTime(message.created_at))}</div>
+                <div>${esc(message.body || "")}</div>
+              </article>`;
+            }),
+            "No messages recorded for this tenant yet."
+          )}
+        </section>
+      </div>
+
+      <div class="detail-grid">
+        <section class="panel detail-section">
+          <h3 class="section-heading">Notices And Arrears</h3>
+          <div class="list">
+            <article class="item">
+              <strong>Vacating Notices</strong>
+              ${
+                recentNotices.length
+                  ? recentNotices
+                      .map((notice) => {
+                        const label = humanizeStatus(notice.status || "Pending");
+                        return `<div class="muted" style="margin-top:10px;">${esc(formatDate(notice.move_out_date))} - ${label}</div>`;
+                      })
+                      .join("")
+                  : '<div class="muted" style="margin-top:10px;">No vacating notices submitted.</div>'
+              }
+            </article>
+            <article class="item">
+              <strong>Arrears</strong>
+              ${
+                recentArrears.length
+                  ? recentArrears
+                      .map(
+                        (arrear) =>
+                          `<div class="muted" style="margin-top:10px;">${esc(arrear.description || "Outstanding balance")} - ${esc(
+                            money(arrear.balance || 0)
+                          )}${arrear.due_date ? ` | Due ${esc(formatDate(arrear.due_date))}` : ""}</div>`
+                      )
+                      .join("")
+                  : '<div class="muted" style="margin-top:10px;">No arrears entries recorded.</div>'
+              }
+            </article>
+          </div>
+        </section>
+
+        <section class="panel detail-section">
+          <h3 class="section-heading">Transactions</h3>
+          ${renderRecordCollection(
+            recentTransactions.map((transaction) => {
+              return `<article class="item">
+                <div class="toolbar">
+                  <strong>${esc(transaction.type || "Transaction")}</strong>
+                  <span class="pill">${esc(money(transaction.amount || 0))}</span>
+                </div>
+                <div>${esc(transaction.description || "No description provided.")}</div>
+                <div class="muted">${esc(formatDateTime(transaction.date_created || transaction.created_at))}</div>
+              </article>`;
+            }),
+            "No transactions recorded for this tenant yet."
+          )}
+        </section>
+      </div>
+    </div>
+  `;
+}
+function renderMessages() {
+  const sender = document.getElementById("messageSenderFilter").value;
+  const search = document.getElementById("messageSearch").value.trim().toLowerCase();
+  const items = state.messages.filter((message) => {
+    const matchesSender = !sender || message.sender_type === sender;
+    const matchesSearch =
+      !search ||
+      `${message.first_name || ""} ${message.last_name || ""} ${message.subject || ""} ${message.category || ""} ${message.body || ""}`
+        .toLowerCase()
+        .includes(search);
+    return matchesSender && matchesSearch;
+  });
+
+  document.getElementById("messageList").innerHTML =
+    items
+      .map((message) => {
+        const senderName = `${message.first_name || ""} ${message.last_name || ""}`.trim() || message.sender_name || "System";
+        return `<article class="item">
+          <div class="toolbar">
+            <strong>${esc(message.subject || "Message")}</strong>
+            <span class="pill">${esc(message.sender_type || "SYSTEM")}</span>
+          </div>
+          <div class="muted">${esc(senderName)} | Unit ${esc(message.house_number || "-")}</div>
+          <div>${esc(message.body || "")}</div>
+        </article>`;
+      })
+      .join("") || '<div class="item">No messages match the current filter.</div>';
+}
+
+function renderDocuments() {
+  document.getElementById("documentList").innerHTML =
+    state.documents
+      .map((doc) => {
+        const actions = doc.url
+          ? `<div class="toolbar" style="margin-top:10px;">
+              <a class="btn secondary" href="${esc(doc.url)}" target="_blank" rel="noopener">Open File</a>
+            </div>`
+          : "";
+        return `<article class="item">
+          <div class="toolbar">
+            <strong>${esc(doc.name || "Document")}</strong>
+            ${renderStatusPill(doc.status || "AVAILABLE", humanizeStatus(doc.status || "AVAILABLE"))}
+          </div>
+          <div class="muted">${esc(doc.category || "General")}</div>
+          <div class="muted">Added ${esc(formatDateTime(doc.created_at))}</div>
+          ${actions}
+        </article>`;
+      })
+      .join("") || '<div class="item">No shared documents have been published yet.</div>';
+}
+
+function renderNotices() {
+  const search = document.getElementById("noticeSearch").value.trim().toLowerCase();
+  const status = document.getElementById("noticeStatusFilter").value;
+  const items = state.notices.filter((notice) => {
+    const matchesStatus = !status || notice.status === status;
+    const matchesSearch =
+      !search ||
+      `${notice.tenant_name || ""} ${notice.house_number || ""} ${notice.property_name || ""}`
+        .toLowerCase()
+        .includes(search);
+    return matchesStatus && matchesSearch;
+  });
+
+  document.getElementById("noticeList").innerHTML =
+    items
+      .map((notice) => {
+        const actionRow = noticeNeedsReview(notice)
+          ? `<div class="toolbar" style="margin-top:10px;">
+              <button class="btn secondary noticeReviewBtn" data-id="${esc(notice.id)}" data-status="APPROVED" type="button">Approve</button>
+              <button class="btn danger noticeReviewBtn" data-id="${esc(notice.id)}" data-status="DISAPPROVED" type="button">Disapprove</button>
+            </div>`
+          : `<div class="muted" style="margin-top:10px;">Reviewed ${esc(formatDateTime(notice.reviewed_at))}</div>`;
+        return `<article class="item">
+          <div class="toolbar">
+            <strong>${esc(notice.tenant_name || "Tenant")}</strong>
+            ${renderStatusPill(notice.status || "Pending", humanizeStatus(notice.status || "Pending"))}
+          </div>
+          <div class="muted">Unit ${esc(notice.house_number || "-")} | ${esc(notice.property_name || "")}</div>
+          <div>Move-out date: ${esc(formatDate(notice.move_out_date))}</div>
+          ${actionRow}
+        </article>`;
+      })
+      .join("") || '<div class="item">No vacating notices match the current filter.</div>';
+}
+
+function renderTickets() {
+  const search = document.getElementById("ticketSearch").value.trim().toLowerCase();
+  const status = document.getElementById("ticketStatusFilter").value;
+  const items = state.tickets.filter((ticket) => {
+    const normalizedStatus = ticketStatusValue(ticket.status);
+    if (!isTicketOpen(normalizedStatus)) {
+      return false;
+    }
+    const matchesStatus = !status || normalizedStatus === status;
+    const matchesSearch =
+      !search ||
+      `${ticket.tenant_name || ""} ${ticket.title || ""} ${normalizedStatus}`.toLowerCase().includes(search);
+    return matchesStatus && matchesSearch;
+  });
+
+  document.getElementById("ticketList").innerHTML =
+    items
+      .map((ticket) => {
+        const normalizedStatus = ticketStatusValue(ticket.status);
+        const buttons =
+          normalizedStatus === "Pending"
+            ? [
+                `<button class="btn warning ticketStatusBtn" data-id="${esc(ticket.id)}" data-status="In Progress" type="button">Mark In Progress</button>`,
+              ]
+            : [
+                `<button class="btn success ticketStatusBtn" data-id="${esc(ticket.id)}" data-status="Solved" type="button">Mark Solved</button>`,
+              ];
+
+        return `<article class="item ticket-${statusClass(normalizedStatus)}">
+          <div class="toolbar">
+            <strong>${esc(ticket.title || "Ticket")}</strong>
+            ${renderStatusPill(normalizedStatus)}
+          </div>
+          <div class="muted">${esc(ticket.tenant_name || "Tenant")} | Unit ${esc(ticket.house_number || "-")}</div>
+          <div>${esc(ticket.description || "No details provided.")}</div>
+          <div class="muted">${ticket.technician_name ? `Technician: ${esc(ticket.technician_name)} | ` : ""}Updated ${esc(formatDateTime(ticket.updated_at))}</div>
+          <div class="toolbar" style="margin-top:10px;">${buttons.join("")}</div>
+        </article>`;
+      })
+      .join("") || '<div class="item">No open tickets match the current filter.</div>';
+}
+
+function renderPaymentSummary() {
+  const summary = state.payments.summary || {};
+  const billing = state.payments.billing || {};
+
+  document.getElementById("paymentStats").innerHTML = [
+    ["Expected Total", money(summary.expected_collection_total || 0)],
+    ["Acquired Total", money(summary.acquired_collection_total || 0)],
+    ["Variance", money(summary.variance || 0)],
+    ["Payment Items", summary.payment_count || 0],
+  ]
+    .map(
+      ([label, value]) =>
+        `<article class="item"><div class="title">${esc(label)}</div><div>${esc(value)}</div></article>`
+    )
+    .join("");
+
+  document.getElementById("expectedCollection").value = Number(summary.expected_collection_total || 0);
+  document.getElementById("acquiredCollection").value = Number(summary.acquired_collection_total || 0);
+  document.getElementById("billingRent").value = Number(billing.rent || 0);
+  document.getElementById("billingWater").value = Number(billing.water || 0);
+  document.getElementById("billingTrash").value = Number(billing.trash || 0);
+  document.getElementById("billingElectricity").value = Number(billing.electricity || 0);
+}
+
+function renderBillingTenantSelection() {
+  const search = document.getElementById("billingTenantSearch").value.trim().toLowerCase();
+  const selected = new Set(state.billingSelection);
+  const filtered = state.users.filter((user) => {
+    if (!search) return true;
+    return `${user.first_name || ""} ${user.last_name || ""} ${user.tenant_id || ""} ${user.house_number || ""}`
+      .toLowerCase()
+      .includes(search);
+  });
+
+  document.getElementById("billingSelectionSummary").textContent = `${state.billingSelection.length} of ${state.users.length} tenants selected`;
+  document.getElementById("billingTenantSelection").innerHTML =
+    filtered
+      .map((user) => {
+        const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
+        return `<label class="item check-item">
+          <input class="billingTenantCheckbox" data-tenant="${esc(user.tenant_id)}" type="checkbox" ${
+            selected.has(user.tenant_id) ? "checked" : ""
+          } />
+          <span>
+            <strong>${esc(tenantName)}</strong>
+            <div class="muted">Tenant ID: ${esc(user.tenant_id || "-")}</div>
+            <div class="muted">Floor ${esc(user.floor_number || "-")} | Unit ${esc(user.house_number || "-")}</div>
+          </span>
+        </label>`;
+      })
+      .join("") || '<div class="item">No tenants match this search.</div>';
+}
+
+function renderPaymentList() {
+  const status = document.getElementById("paymentStatusFilter").value;
+  const search = document.getElementById("paymentSearch").value.trim().toLowerCase();
+  const items = (state.payments.payments || []).filter((payment) => {
+    const matchesStatus = !status || payment.status === status;
+    const matchesSearch =
+      !search ||
+      `${payment.tenant_name || ""} ${payment.reference || ""} ${payment.phone_number || ""} ${payment.house_number || ""} ${payment.payment_for || ""}`
+        .toLowerCase()
+        .includes(search);
+    return matchesStatus && matchesSearch;
+  });
+
+  document.getElementById("paymentList").innerHTML =
+    items
+      .map((payment) => {
+        const label = humanizeStatus(payment.status || "PENDING_CONFIRMATION");
+        const actionRow = paymentNeedsReview(payment)
+          ? `<div class="toolbar" style="margin-top:10px;">
+              <button class="btn success paymentReviewBtn" data-id="${esc(payment.id)}" data-status="APPROVED" type="button">Approve</button>
+              <button class="btn danger paymentReviewBtn" data-id="${esc(payment.id)}" data-status="DISAPPROVED" type="button">Disapprove</button>
+            </div>`
+          : `<div class="muted" style="margin-top:10px;">Reviewed ${esc(formatDateTime(payment.reviewed_at))}</div>`;
+        return `<article class="item payment-${statusClass(payment.status)}">
+          <div class="toolbar">
+            <strong>${esc(payment.tenant_name || "Tenant")}</strong>
+            ${renderStatusPill(payment.status || "PENDING_CONFIRMATION", label)}
+          </div>
+          <div class="muted">Unit ${esc(payment.house_number || "-")} | Floor ${esc(payment.floor_number || "-")}</div>
+          <div>${esc(money(payment.amount || 0))} for ${esc(payment.payment_for || "RENT")}</div>
+          <div class="muted">Reference: ${esc(payment.reference || "-")} | Phone: ${esc(payment.phone_number || "-")}</div>
+          ${actionRow}
+        </article>`;
+      })
+      .join("") || '<div class="item">No payment items match the current filter.</div>';
+}
+
+async function loadTenantDetail(id) {
+  state.tenantDetail = await fetchJson(`/api/admin/tenants/${encodeURIComponent(id)}/details`);
+  renderTenantDetail();
+  switchTab("tenant-detail");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function closeTenantDetail() {
+  state.tenantDetail = null;
+  document.getElementById("tenantDetail").innerHTML = "";
+  switchTab("tenants");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function loadConversation() {
+  const id = document.getElementById("messageTenant").value;
+  const data = await fetchJson(`/api/admin/messages/${encodeURIComponent(id)}`);
+  document.getElementById("messageThread").innerHTML = data.messages.length
+    ? data.messages
+        .map(
+          (message) => `<article class="item">
+            <strong>${esc(message.subject || "Message")}</strong>
+            <div class="muted">${esc(message.sender_name || message.sender_type || "System")}</div>
+            <div>${esc(message.body || "")}</div>
+          </article>`
+        )
+        .join("")
+    : '<div class="item">No messages yet for this tenant.</div>';
+  setStatus("Conversation loaded.", false);
+}
+
+async function loadAllData() {
+  if (loadAllDataPromise) {
+    return loadAllDataPromise;
+  }
+
+  loadAllDataPromise = (async () => {
+    await ensureSession();
+    const visibleTenantId = getVisibleTenantDetailId();
+    const [overview, users, documents, messages, notices, tickets, payments] = await Promise.all([
+      fetchJson("/api/admin/overview"),
+      fetchJson("/api/admin/users"),
+      fetchJson("/api/admin/documents"),
+      fetchJson("/api/admin/messages"),
+      fetchJson("/api/admin/vacating-notices"),
+      fetchJson("/api/admin/tickets"),
+      fetchJson("/api/admin/payments"),
+    ]);
+
+    state.overview = overview;
+    state.users = users.users || [];
+    state.documents = documents.documents || [];
+    state.messages = messages.messages || [];
+    state.notices = notices.notices || [];
+    state.tickets = tickets.tickets || [];
+    state.payments = payments || { summary: {}, billing: {}, payments: [] };
+
+    syncBillingSelection();
+    fillFloorSelect();
+    renderOverview();
+    renderTenantOptions();
+    renderTenants();
+    renderDocuments();
+    renderMessages();
+    renderNotices();
+    renderTickets();
+    renderPaymentSummary();
+    renderBillingTenantSelection();
+    renderPaymentList();
+
+    if (visibleTenantId) {
+      try {
+        state.tenantDetail = await fetchJson(`/api/admin/tenants/${encodeURIComponent(visibleTenantId)}/details`);
+        renderTenantDetail();
+      } catch (error) {
+        closeTenantDetail();
+        setStatus(error.message, true);
+      }
+    }
+  })().finally(() => {
+    loadAllDataPromise = null;
+  });
+
+  return loadAllDataPromise;
+}
+
+async function refreshAdminData({ silent = true, force = false } = {}) {
+  if (!force && (document.hidden || shouldPauseAutoRefresh())) {
+    return;
+  }
+
+  try {
+    await loadAllData();
+    if (!silent) {
+      setStatus("Admin data refreshed.", false);
+    }
+  } catch (error) {
+    if (silent) {
+      console.error("Admin auto-refresh failed:", error);
+      return;
+    }
+    setStatus(error.message, true);
+  }
+}
+
+function startAdminAutoRefresh() {
+  if (adminAutoRefreshTimer) {
+    clearInterval(adminAutoRefreshTimer);
+  }
+  adminAutoRefreshTimer = window.setInterval(() => {
+    refreshAdminData({ silent: true });
+  }, AUTO_REFRESH_INTERVAL_MS);
+}
+
+function stopAdminAutoRefresh() {
+  if (!adminAutoRefreshTimer) return;
+  clearInterval(adminAutoRefreshTimer);
+  adminAutoRefreshTimer = null;
+}
+async function createUser(event) {
+  event.preventDefault();
+  await fetchJson("/api/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      first_name: document.getElementById("firstName").value.trim(),
+      last_name: document.getElementById("lastName").value.trim(),
+      account_number: document.getElementById("accountNumber").value.trim(),
+      floor_number: document.getElementById("floorNumber").value.trim(),
+      house_number: document.getElementById("houseNumber").value.trim(),
+      phone_number: document.getElementById("phoneNumber").value.trim(),
+      rent: document.getElementById("rent").value.trim(),
+      account_balance: document.getElementById("accountBalance").value.trim(),
+      arrears: document.getElementById("arrears").value.trim(),
+    }),
+  });
+  document.getElementById("createUserForm").reset();
+  await loadAllData();
+  setStatus("User created successfully.", false);
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  await fetchJson("/api/admin/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tenant_id: document.getElementById("messageTenant").value,
+      sender_name: document.getElementById("messageSender").value.trim(),
+      category: document.getElementById("messageCategory").value.trim(),
+      subject: document.getElementById("messageSubject").value.trim(),
+      body: document.getElementById("messageBody").value.trim(),
+    }),
+  });
+  document.getElementById("messageSubject").value = "";
+  document.getElementById("messageBody").value = "";
+  await loadAllData();
+  setStatus("System message sent.", false);
+}
+
+async function uploadSharedDocument(event) {
+  event.preventDefault();
+  const fileInput = document.getElementById("sharedDocumentFile");
+  const file = fileInput.files?.[0];
+  if (!file) {
+    throw new Error("Choose a file before uploading.");
+  }
+
+  const formData = new FormData();
+  formData.append("name", document.getElementById("sharedDocumentName").value.trim());
+  formData.append("category", document.getElementById("sharedDocumentCategory").value.trim());
+  formData.append("status", document.getElementById("sharedDocumentStatus").value);
+  formData.append("file", file);
+
+  const response = await fetch("/api/admin/documents/shared", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (response.status === 401) {
+    window.location.href = "/secure-admin/login";
+    throw new Error("Admin session expired");
+  }
+
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("application/json")) {
+    throw new Error("Expected JSON from document upload");
+  }
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Document upload failed");
+  }
+
+  document.getElementById("sharedDocumentForm").reset();
+  document.getElementById("sharedDocumentCategory").value = "General";
+  document.getElementById("sharedDocumentStatus").value = "AVAILABLE";
+  await loadAllData();
+  setStatus("Shared document uploaded for all tenants.", false);
+}
+
+async function savePaymentTargets(event) {
+  event.preventDefault();
+  await fetchJson("/api/admin/payments/targets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      expected_collection_total: document.getElementById("expectedCollection").value,
+      acquired_collection_total: document.getElementById("acquiredCollection").value,
+    }),
+  });
+  await loadAllData();
+  setStatus("Payment totals saved.", false);
+}
+
+async function saveBillingConfig(event) {
+  event.preventDefault();
+  if (!state.billingSelection.length) {
+    throw new Error("Select at least one tenant before applying bill values.");
+  }
+
+  const result = await fetchJson("/api/admin/payments/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      rent: document.getElementById("billingRent").value,
+      water: document.getElementById("billingWater").value,
+      trash: document.getElementById("billingTrash").value,
+      electricity: document.getElementById("billingElectricity").value,
+      tenant_ids: state.billingSelection,
+    }),
+  });
+
+  await loadAllData();
+  setStatus(`Bill values applied to ${result.applied_count || state.billingSelection.length} selected tenant(s).`, false);
+}
+
+async function saveOccupancy(event) {
+  event.preventDefault();
+  await fetchJson("/api/admin/occupancy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      occupied_units: document.getElementById("occupiedUnitsInput").value,
+      vacant_units: document.getElementById("vacantUnitsInput").value,
+    }),
+  });
+  await loadAllData();
+  setStatus("Occupancy updated.", false);
+}
+
+async function deleteUser(id) {
+  await fetchJson(`/api/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await loadAllData();
+  setStatus("User deleted.", false);
+}
+
+async function logout() {
+  stopAdminAutoRefresh();
+  await fetch("/api/admin/logout", { method: "POST" });
+  window.location.href = "/secure-admin/login";
+}
+
+document.querySelectorAll(".nav button").forEach((button) =>
+  button.addEventListener("click", () => {
+    switchTab(button.dataset.tab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  })
+);
+document
+  .getElementById("refreshAllBtn")
+  .addEventListener("click", () => refreshAdminData({ silent: false, force: true }));
+document.getElementById("logoutBtn").addEventListener("click", logout);
+document.getElementById("createUserForm").addEventListener("submit", (event) => createUser(event).catch((error) => setStatus(error.message, true)));
+document.getElementById("sharedDocumentForm").addEventListener("submit", (event) => uploadSharedDocument(event).catch((error) => setStatus(error.message, true)));
+document.getElementById("sendMessageForm").addEventListener("submit", (event) => sendMessage(event).catch((error) => setStatus(error.message, true)));
+document.getElementById("paymentTargetsForm").addEventListener("submit", (event) => savePaymentTargets(event).catch((error) => setStatus(error.message, true)));
+document.getElementById("billingConfigForm").addEventListener("submit", (event) => saveBillingConfig(event).catch((error) => setStatus(error.message, true)));
+document.getElementById("occupancyForm").addEventListener("submit", (event) => saveOccupancy(event).catch((error) => setStatus(error.message, true)));
+document.getElementById("backToTenantsBtn").addEventListener("click", closeTenantDetail);
+document.getElementById("loadMessagesBtn").addEventListener("click", () => loadConversation().catch((error) => setStatus(error.message, true)));
+document.getElementById("tenantFloorFilter").addEventListener("change", renderTenants);
+document.getElementById("tenantSearch").addEventListener("input", renderTenants);
+document.getElementById("messageSenderFilter").addEventListener("change", renderMessages);
+document.getElementById("messageSearch").addEventListener("input", renderMessages);
+document.getElementById("noticeSearch").addEventListener("input", renderNotices);
+document.getElementById("noticeStatusFilter").addEventListener("change", renderNotices);
+document.getElementById("ticketSearch").addEventListener("input", renderTickets);
+document.getElementById("ticketStatusFilter").addEventListener("change", renderTickets);
+document.getElementById("paymentStatusFilter").addEventListener("change", renderPaymentList);
+document.getElementById("paymentSearch").addEventListener("input", renderPaymentList);
+document.getElementById("billingTenantSearch").addEventListener("input", renderBillingTenantSelection);
+document.getElementById("selectAllBillingTenantsBtn").addEventListener("click", () => {
+  setBillingSelection(state.users.map((user) => user.tenant_id).filter(Boolean));
+});
+document.getElementById("clearBillingTenantsBtn").addEventListener("click", () => {
+  setBillingSelection([]);
+});
+document.getElementById("billingTenantSelection").addEventListener("change", (event) => {
+  const checkbox = event.target.closest(".billingTenantCheckbox");
+  if (!checkbox) return;
+  const nextSelection = new Set(state.billingSelection);
+  if (checkbox.checked) {
+    nextSelection.add(checkbox.dataset.tenant);
+  } else {
+    nextSelection.delete(checkbox.dataset.tenant);
+  }
+  setBillingSelection([...nextSelection]);
+});
+document.getElementById("tenantCards").addEventListener("click", async (event) => {
+  const openButton = event.target.closest(".openTenantBtn");
+  const deleteButton = event.target.closest(".deleteBtn");
+
+  if (deleteButton) {
+    try {
+      if (confirm(`Delete user ${deleteButton.dataset.tenant}?`)) {
+        await deleteUser(deleteButton.dataset.tenant);
+      }
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+    return;
+  }
+
+  if (openButton) {
+    try {
+      await loadTenantDetail(openButton.dataset.tenant);
+      setStatus("Tenant record loaded.", false);
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  }
+});
+document.getElementById("noticeList").addEventListener("click", async (event) => {
+  const button = event.target.closest(".noticeReviewBtn");
+  if (!button) return;
+  try {
+    await fetchJson(`/api/admin/vacating-notices/${button.dataset.id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: button.dataset.status }),
+    });
+    await loadAllData();
+    setStatus("Vacating notice reviewed.", false);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+});
+document.getElementById("ticketList").addEventListener("click", async (event) => {
+  const button = event.target.closest(".ticketStatusBtn");
+  if (!button) return;
+  try {
+    await fetchJson(`/api/admin/tickets/${button.dataset.id}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: button.dataset.status }),
+    });
+    await loadAllData();
+    setStatus(button.dataset.status === "Solved" ? "Ticket solved and cleared from the open list." : "Ticket moved to in progress.", false);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+});
+document.getElementById("paymentList").addEventListener("click", async (event) => {
+  const button = event.target.closest(".paymentReviewBtn");
+  if (!button) return;
+  try {
+    await fetchJson(`/api/admin/payments/${button.dataset.id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: button.dataset.status }),
+    });
+    await loadAllData();
+    setStatus(`Payment ${button.dataset.status === "APPROVED" ? "approved" : "disapproved"}.`, false);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    refreshAdminData({ silent: true, force: true });
+  }
+});
+
+loadAllData()
+  .then(() => startAdminAutoRefresh())
+  .catch((error) => setStatus(error.message, true));
+</script>
+</body>
+</html>

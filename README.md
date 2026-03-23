@@ -124,12 +124,11 @@ A Render Blueprint file is included at:
 render.yaml
 ```
 
-It configures:
-- one Node web service
-- one persistent disk mounted at `/opt/render/project/src/storage`
-- `DB_PATH`, `BACKUP_DIR`, and `UPLOAD_DIR` on that disk
+It currently configures:
+- one Node web service on the `free` plan
+- temporary local paths for `DB_PATH`, `BACKUP_DIR`, and `UPLOAD_DIR`
 - `/api/health` as the health check
-- one app instance, which is the safe setup while the app uses SQLite
+- one app instance
 
 Suggested deploy flow:
 
@@ -140,6 +139,17 @@ Suggested deploy flow:
 5. After the first deploy, connect your custom domain in Render and update `APP_BASE_URL` to that exact HTTPS URL.
 
 The included blueprint assumes the `frankfurt` region as a reasonable default for East Africa, but you can change that before the first deploy if you prefer another region.
+
+### Important: Render Free limitations
+
+This current free setup is suitable for previewing the live pages on the internet, but not for durable tenant data.
+
+- The service can spin down after idle time.
+- Local SQLite data, uploaded files, and generated backups are not durable on Render Free.
+- Any restart or redeploy can reset the local database and uploads.
+- This means you should treat the free deployment as a public preview or temporary demo environment.
+
+When you upgrade later, move back to a paid Render service with a persistent disk, or migrate to a hosted database and object storage.
 
 ## Docker
 

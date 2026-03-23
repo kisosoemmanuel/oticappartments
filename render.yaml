@@ -2,26 +2,22 @@ services:
   - type: web
     name: otic-apartments
     runtime: node
-    plan: starter
+    plan: free
     region: frankfurt
     numInstances: 1
     autoDeployTrigger: checksPass
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /api/health
-    disk:
-      name: otic-storage
-      mountPath: /opt/render/project/src/storage
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: DB_PATH
-        value: /opt/render/project/src/storage/data.sqlite
+        value: /opt/render/project/src/runtime/data.sqlite
       - key: BACKUP_DIR
-        value: /opt/render/project/src/storage/backups
+        value: /opt/render/project/src/runtime/backups
       - key: UPLOAD_DIR
-        value: /opt/render/project/src/storage/uploads
+        value: /opt/render/project/src/runtime/uploads
       - key: APP_BASE_URL
         sync: false
       - key: ADMIN_USERNAME

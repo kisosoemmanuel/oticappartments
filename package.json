@@ -1,12 +1,15 @@
 {
   "name": "otic-apartments-tenant-portal",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "reset:data": "node scripts/reset-data.mjs"
+    "reset:data": "node scripts/reset-data.mjs",
+    "check:syntax": "node scripts/check-syntax.mjs",
+    "validate": "npm run check:syntax && node scripts/validate-system.mjs",
+    "version:beta": "npm version prerelease --preid beta --no-git-tag-version"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

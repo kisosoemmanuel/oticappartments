@@ -38,8 +38,11 @@
     </form>
   </main>
   <script>
+    const ADMIN_SESSION_STORAGE_KEY = 'oticAdminSessionToken';
     const form = document.getElementById('loginForm');
     const statusEl = document.getElementById('status');
+
+    localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -61,10 +64,15 @@
         return;
       }
 
+      if (data.token) {
+        localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, data.token);
+      }
+
       statusEl.textContent = 'Opening admin dashboard...';
 
       const sessionRes = await fetch('/api/admin/session', {
         credentials: 'same-origin',
+        headers: data.token ? { Authorization: `Bearer ${data.token}` } : {},
       });
 
       if (!sessionRes.ok) {

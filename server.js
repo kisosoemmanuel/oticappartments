@@ -393,7 +393,10 @@ function clearAdminSession(req, res) {
 
 function requireAdminSession(req, res, next) {
   const cookies = parseCookies(req);
-  const token = cookies[ADMIN_SESSION_COOKIE];
+  const token =
+    cookies[ADMIN_SESSION_COOKIE] ||
+    (req.header("authorization") || "").replace(/^Bearer\s+/i, "") ||
+    req.header("x-admin-token");
   const session = getAdminSessionFromToken(token);
   if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -780,7 +783,7 @@ app.post("/api/admin/login", (req, res) => {
     ...adminCookieOptions,
     maxAge: 1000 * 60 * 60 * 12,
   });
-  res.json({ success: true, username });
+  res.json({ success: true, username, token });
 });
 
 app.post("/api/admin/logout", (req, res) => {

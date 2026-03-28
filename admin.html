@@ -100,7 +100,7 @@ textarea{min-height:120px;resize:vertical}
 <div class="grid stats" id="overviewStats"></div>
 <div class="split"><section class="panel"><h2 class="title">Action Queue</h2><div id="actionQueue" class="list"></div></section><section class="panel"><h2 class="title">Occupancy Control</h2><form id="occupancyForm" class="stack"><div class="filters"><div><label for="occupiedUnitsInput">Occupied Units</label><input id="occupiedUnitsInput" type="number" min="0" step="1" /></div><div><label for="vacantUnitsInput">Vacant Units</label><input id="vacantUnitsInput" type="number" min="0" step="1" /></div></div><button class="btn" type="submit">Save Occupancy</button></form></section></div>
 </section>
-<section id="tab-tenants" class="hidden"><div id="tenantListView" class="three"><section class="panel"><h2 class="title">Tenant Filters</h2><div class="filters"><div><label for="tenantFloorFilter">Floor</label><select id="tenantFloorFilter"></select></div><div><label for="tenantSearch">Search</label><input id="tenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div id="tenantCards" class="list"></div></section><section class="panel"><h2 class="title">Quick Preview</h2><div id="tenantPreview" class="list"><div class="item">Choose a tenant to preview their record.</div></div></section><section class="panel"><h2 class="title">Create Tenant</h2><form id="createUserForm" class="stack"><div class="filters"><div><label for="firstName">First name</label><input id="firstName" /></div><div><label for="lastName">Last name</label><input id="lastName" /></div><div><label for="accountNumber">Account number</label><input id="accountNumber" /></div><div><label for="floorNumber">Floor number</label><input id="floorNumber" /></div><div><label for="houseNumber">Unit / house number</label><input id="houseNumber" /></div><div><label for="phoneNumber">Phone</label><input id="phoneNumber" /></div><div><label for="rent">Rent</label><input id="rent" type="number" min="0" step="0.01" /></div><div><label for="deposit">Deposit</label><input id="deposit" type="number" min="0" step="0.01" /></div><div><label for="accountBalance">Account balance</label><input id="accountBalance" /></div><div><label for="arrears">Arrears</label><input id="arrears" /></div></div><button class="btn" type="submit">Create user</button></form></section></div></section>
+<section id="tab-tenants" class="hidden"><div id="tenantListView" class="three"><section class="panel"><h2 class="title">Tenant Filters</h2><div class="filters"><div><label for="tenantFloorFilter">Floor</label><select id="tenantFloorFilter"></select></div><div><label for="tenantSearch">Search</label><input id="tenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div id="tenantCards" class="list"></div></section><section class="panel"><h2 class="title">Quick Preview</h2><div id="tenantPreview" class="list"><div class="item">Choose a tenant to preview their record.</div></div></section><section class="panel"><h2 class="title">Create Tenant</h2><form id="createUserForm" class="stack"><div class="filters"><div><label for="firstName">First name</label><input id="firstName" required /></div><div><label for="lastName">Last name</label><input id="lastName" /></div><div><label for="accountNumber">Account number</label><input id="accountNumber" required /></div><div><label for="floorNumber">Floor number</label><input id="floorNumber" /></div><div><label for="houseNumber">Unit / house number</label><input id="houseNumber" /></div><div><label for="phoneNumber">Phone</label><input id="phoneNumber" /></div><div><label for="rent">Rent</label><input id="rent" type="number" min="0" step="0.01" /></div><div><label for="deposit">Deposit</label><input id="deposit" type="number" min="0" step="0.01" /></div><div><label for="accountBalance">Account balance</label><input id="accountBalance" /></div><div><label for="arrears">Arrears</label><input id="arrears" /></div></div><button class="btn" type="submit">Create user</button></form></section></div></section>
 <section id="tab-tenant-detail" class="hidden"><div class="toolbar" style="justify-content:space-between;margin-bottom:14px;"><button class="btn secondary" id="backToTenantsBtn" type="button">Back to Tenants</button><span class="pill">Tenant Record</span></div><div id="tenantDetail"></div></section>
 <section id="tab-documents" class="hidden"><div class="split"><section class="panel"><h2 class="title">Upload Shared Document</h2><form id="sharedDocumentForm" class="stack"><div class="filters"><div><label for="sharedDocumentName">Document name</label><input id="sharedDocumentName" placeholder="e.g. House Rules" /></div><div><label for="sharedDocumentCategory">Category</label><input id="sharedDocumentCategory" value="General" /></div></div><div><label for="sharedDocumentStatus">Status</label><select id="sharedDocumentStatus"><option value="AVAILABLE">Available</option><option value="REQUIRED">Required</option><option value="IMPORTANT">Important</option></select></div><div><label for="sharedDocumentFile">File</label><input id="sharedDocumentFile" type="file" /></div><button class="btn" type="submit">Upload For All Tenants</button></form></section><section class="panel"><div class="toolbar" style="justify-content:space-between;"><h2 class="title" style="margin:0;">Published Documents</h2><span class="pill">Visible To Every Tenant</span></div><div id="documentList" class="list" style="margin-top:14px;"></div></section></div></section>
 <section id="tab-messages" class="hidden"><div class="split"><section class="panel"><h2 class="title">All Messages</h2><div class="filters"><div><label for="messageSenderFilter">Sender type</label><select id="messageSenderFilter"><option value="">All senders</option><option value="TENANT">Tenant</option><option value="ADMIN">Admin</option><option value="SYSTEM">System</option></select></div><div><label for="messageSearch">Search</label><input id="messageSearch" placeholder="Tenant, subject, category, body" /></div></div><div id="messageList" class="list"></div></section><section class="panel"><h2 class="title">Send Message</h2><form id="sendMessageForm" class="stack"><div><label for="messageTenant">Tenant</label><select id="messageTenant"></select></div><div class="filters"><div><label for="messageSender">Sender name</label><input id="messageSender" value="Davies Muchai" /></div><div><label for="messageCategory">Category</label><input id="messageCategory" value="Billing" /></div></div><div><label for="messageSubject">Subject</label><input id="messageSubject" /></div><div><label for="messageBody">Message body</label><textarea id="messageBody"></textarea></div><button class="btn" type="submit">Send message</button></form><div class="toolbar" style="margin-top:14px;"><button class="btn secondary" id="loadMessagesBtn" type="button">Load conversation</button></div><div id="messageThread" class="list" style="margin-top:14px;"></div></section></div></section>
@@ -126,6 +126,7 @@ const state = {
 const statusEl = document.getElementById("status");
 const identityEl = document.getElementById("identity");
 const AUTO_REFRESH_INTERVAL_MS = 10000;
+const ADMIN_SESSION_STORAGE_KEY = "oticAdminSessionToken";
 let adminAutoRefreshTimer = null;
 let loadAllDataPromise = null;
 let loadAllDataRequestId = 0;
@@ -143,6 +144,14 @@ const money = (value) =>
 function setStatus(text, isError) {
   statusEl.textContent = text;
   statusEl.className = `status ${isError ? "error" : "success"}`;
+}
+
+function getAdminSessionToken() {
+  return localStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || "";
+}
+
+function clearAdminSessionToken() {
+  localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
 }
 
 function humanizeStatus(value) {
@@ -221,9 +230,14 @@ async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 15000);
   let response;
+  const headers = new Headers(options.headers || {});
+  const adminToken = getAdminSessionToken();
+  if (adminToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${adminToken}`);
+  }
 
   try {
-    response = await fetch(url, { credentials: "same-origin", signal: controller.signal, ...options });
+    response = await fetch(url, { credentials: "same-origin", signal: controller.signal, ...options, headers });
   } catch (error) {
     if (error.name === "AbortError") {
       throw new Error(`Request timed out for ${url}`);
@@ -234,6 +248,7 @@ async function fetchJson(url, options = {}) {
   }
 
   if (response.status === 401) {
+    clearAdminSessionToken();
     window.location.href = "/secure-admin/login";
     throw new Error("Admin session expired");
   }
@@ -957,21 +972,27 @@ function stopAdminAutoRefresh() {
 }
 async function createUser(event) {
   event.preventDefault();
+  const payload = {
+    first_name: document.getElementById("firstName").value.trim(),
+    last_name: document.getElementById("lastName").value.trim(),
+    account_number: document.getElementById("accountNumber").value.trim(),
+    floor_number: document.getElementById("floorNumber").value.trim(),
+    house_number: document.getElementById("houseNumber").value.trim(),
+    phone_number: document.getElementById("phoneNumber").value.trim(),
+    rent: document.getElementById("rent").value.trim(),
+    deposit: document.getElementById("deposit").value.trim(),
+    account_balance: document.getElementById("accountBalance").value.trim(),
+    arrears: document.getElementById("arrears").value.trim(),
+  };
+
+  if (!payload.first_name || !payload.account_number) {
+    throw new Error("First name and account number are required before creating a tenant.");
+  }
+
   await fetchJson("/api/admin/users", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      first_name: document.getElementById("firstName").value.trim(),
-      last_name: document.getElementById("lastName").value.trim(),
-      account_number: document.getElementById("accountNumber").value.trim(),
-      floor_number: document.getElementById("floorNumber").value.trim(),
-      house_number: document.getElementById("houseNumber").value.trim(),
-      phone_number: document.getElementById("phoneNumber").value.trim(),
-      rent: document.getElementById("rent").value.trim(),
-      deposit: document.getElementById("deposit").value.trim(),
-      account_balance: document.getElementById("accountBalance").value.trim(),
-      arrears: document.getElementById("arrears").value.trim(),
-    }),
+    body: JSON.stringify(payload),
   });
   document.getElementById("createUserForm").reset();
   await loadAllData({ force: true });
@@ -1096,7 +1117,8 @@ async function deleteUser(id) {
 
 async function logout() {
   stopAdminAutoRefresh();
-  await fetch("/api/admin/logout", { method: "POST" });
+  clearAdminSessionToken();
+  await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin" });
   window.location.href = "/secure-admin/login";
 }
 

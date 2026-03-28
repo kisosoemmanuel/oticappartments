@@ -1,5 +1,6 @@
 databases:
-  - name: otic-apartments-db
+  - name: otic-apartments-db-frankfurt
+    region: frankfurt
     plan: free
 
 services:
@@ -18,7 +19,7 @@ services:
         value: production
       - key: DATABASE_URL
         fromDatabase:
-          name: otic-apartments-db
+          name: otic-apartments-db-frankfurt
           property: connectionString
       - key: BACKUP_DIR
         value: /opt/render/project/src/runtime/backups

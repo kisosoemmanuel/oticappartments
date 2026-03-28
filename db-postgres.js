@@ -1065,6 +1065,15 @@ export async function getPortfolioOverview() {
   };
 }
 
-await initDb();
+try {
+  await initDb();
+} catch (error) {
+  const message = [
+    "Postgres initialization failed.",
+    error?.message || "Unknown database error.",
+    "If you are using Render's internal connection string, make sure the web service and Postgres database are in the same region.",
+  ].join(" ");
+  throw new Error(message);
+}
 
 export default pool;

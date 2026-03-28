@@ -364,6 +364,12 @@ function requireAdminSession(req, res, next) {
   next();
 }
 
+function setNoStore(res) {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+}
+
 async function validateAuth(req, res) {
   const token =
     req.header("token") ||
@@ -390,6 +396,11 @@ async function validateAuth(req, res) {
 }
 
 createEncryptedBackup();
+
+app.use("/api/admin", (_req, res, next) => {
+  setNoStore(res);
+  next();
+});
 
 app.post("/api/pegasus/visionary/tenant/app/login", asyncHandler(async (req, res) => {
   const { first_name, account_number } = req.body || {};
@@ -1193,10 +1204,12 @@ app.post("/api/admin/tickets/:id/status", requireAdminSession, asyncHandler(asyn
 }));
 
 app.get("/secure-admin", (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
 app.get("/secure-admin/login", (req, res) => {
+  setNoStore(res);
   res.sendFile(path.join(__dirname, "admin-login.html"));
 });
 

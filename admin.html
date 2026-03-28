@@ -218,7 +218,21 @@ function shouldPauseAutoRefresh() {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, { credentials: "same-origin", ...options });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  let response;
+
+  try {
+    response = await fetch(url, { credentials: "same-origin", signal: controller.signal, ...options });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`Request timed out for ${url}`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
   if (response.status === 401) {
     window.location.href = "/secure-admin/login";
     throw new Error("Admin session expired");

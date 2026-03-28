@@ -61,6 +61,18 @@
         return;
       }
 
+      statusEl.textContent = 'Opening admin dashboard...';
+
+      const sessionRes = await fetch('/api/admin/session', {
+        credentials: 'same-origin',
+      });
+
+      if (!sessionRes.ok) {
+        const sessionData = await sessionRes.json().catch(() => ({}));
+        statusEl.textContent = sessionData.error || 'Admin session could not be confirmed';
+        return;
+      }
+
       window.location.href = '/secure-admin';
     });
   </script>

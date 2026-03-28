@@ -12,7 +12,8 @@ It is not trying to be a huge property-management platform. It is closer to a fo
 
 - Node.js
 - Express
-- SQLite with `better-sqlite3`
+- PostgreSQL on Render for deployment
+- SQLite with `better-sqlite3` as the local fallback
 - Vanilla HTML, CSS, and JavaScript on the frontend
 - `multer` for document uploads
 
@@ -97,6 +98,7 @@ On a fresh database, the usual flow is:
 
 - `npm start` - start the server
 - `npm run reset:data` - wipe the database, admin settings, backups, and uploads
+- `npm run migrate:sqlite-to-postgres` - copy data from a local SQLite file into the configured Postgres database
 - `npm run check:syntax` - run a basic syntax check
 - `npm run validate` - run the project validation script
 
@@ -111,9 +113,11 @@ Current variables:
 - `NODE_ENV`
 - `PORT`
 - `APP_BASE_URL`
+- `DATABASE_URL`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
 - `BACKUP_SECRET`
+- `SQLITE_DB_PATH`
 - `DB_PATH`
 - `BACKUP_DIR`
 - `UPLOAD_DIR`
@@ -121,24 +125,26 @@ Current variables:
 Important notes:
 
 - In production, the server will refuse to start unless `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `BACKUP_SECRET` are set.
-- `DB_PATH` should point to persistent storage if you are deploying this for real use.
+- `DATABASE_URL` is the main production database setting and is what the Render deployment should use.
+- `SQLITE_DB_PATH` is optional and is only used by the one-time migration script when you want to import an existing SQLite file into Postgres.
+- `DB_PATH` is still available for local SQLite fallback.
 - `BACKUP_DIR` should also be persistent.
 - `UPLOAD_DIR` should also be persistent so shared files survive restarts and redeploys.
 
 ## Deployment notes
 
-This is a stateful Node app. It uses SQLite and also writes files to disk, so it needs a host that supports:
+This is a stateful Node app. It now uses Render Postgres for deployed data and still writes uploaded files to disk, so it needs a host that supports:
 
 - a long-running web service
 - persistent storage
 - environment variables
-- a single running instance if you keep SQLite as the main database
+- a managed PostgreSQL database
 
 Good fits:
 
 - a VPS running Node directly
 - Docker on a VPS
-- a platform like Render with persistent disk support
+- a platform like Render with Postgres plus persistent disk support
 
 Poor fits:
 
@@ -149,16 +155,25 @@ The repo includes both a `Dockerfile` and a `render.yaml` file.
 
 ### Render note
 
-The included Render setup is fine for previewing the app online, but the free tier is not a good long-term home for tenant data.
+The included Render setup now provisions a free Render Postgres database for application data. That removes the old problem where tenant records disappeared because the app was writing to local SQLite on an ephemeral filesystem.
 
 On Render Free:
 
 - the service may spin down when idle
-- local SQLite data is not durable
 - uploaded files are not durable
 - backups written to local disk are not durable
 
 If you want to keep real tenant data, use persistent storage on a paid plan or move the database and file storage to services designed for that.
+
+### One-time data migration
+
+If you already have useful data in a local SQLite file and want to move it into Render Postgres, use:
+
+```bash
+npm run migrate:sqlite-to-postgres
+```
+
+By default, the migration reads from `data.sqlite`. If your SQLite file lives somewhere else, set `SQLITE_DB_PATH` first.
 
 ## Security and data notes
 

@@ -3,7 +3,10 @@ import { spawnSync } from "node:child_process";
 
 const filesToCheck = [
   "db.js",
+  "db-postgres.js",
+  "db-sqlite.js",
   "server.js",
+  "scripts/migrate-sqlite-to-postgres.mjs",
   "static/app.js",
   "scripts/reset-data.mjs",
   "scripts/validate-system.mjs",

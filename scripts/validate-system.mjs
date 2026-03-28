@@ -95,6 +95,7 @@ async function startServer() {
       cwd: process.cwd(),
       env: {
         ...process.env,
+        DATABASE_URL: "",
         DB_PATH: path.join(tempRoot, "data.sqlite"),
         BACKUP_DIR: path.join(tempRoot, "backups"),
         UPLOAD_DIR: path.join(tempRoot, "uploads"),

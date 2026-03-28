@@ -1,3 +1,7 @@
+databases:
+  - name: otic-apartments-db
+    plan: free
+
 services:
   - type: web
     name: otic-apartments
@@ -12,8 +16,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DB_PATH
-        value: /opt/render/project/src/runtime/data.sqlite
+      - key: DATABASE_URL
+        fromDatabase:
+          name: otic-apartments-db
+          property: connectionString
       - key: BACKUP_DIR
         value: /opt/render/project/src/runtime/backups
       - key: UPLOAD_DIR

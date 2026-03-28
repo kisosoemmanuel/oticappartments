@@ -17,6 +17,7 @@ import {
   adjustUserBalance,
   applyGlobalBilling,
   createUser,
+  DATABASE_PROVIDER,
   DATABASE_PATH,
   deleteUserById,
   getPaymentRequestById,
@@ -78,6 +79,7 @@ const adminCookieOptions = {
   sameSite: "lax",
   secure: IS_PRODUCTION,
 };
+const asyncHandler = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 
 fs.mkdirSync(DOCUMENT_UPLOAD_DIR, { recursive: true });
 
@@ -135,7 +137,7 @@ function getBackupStats() {
 }
 
 function createEncryptedBackup() {
-  if (!fs.existsSync(DATABASE_PATH)) {
+  if (DATABASE_PROVIDER !== "sqlite" || !DATABASE_PATH || !fs.existsSync(DATABASE_PATH)) {
     return getBackupStats();
   }
 
@@ -179,7 +181,7 @@ function sanitizeTenantMaintenanceTicket(ticket) {
   return response;
 }
 
-function buildAutomatedAlerts(user) {
+async function buildAutomatedAlerts(user) {
   const generated = [];
   const arrearsAmount = Number(user.arrears || 0);
   if (arrearsAmount > 0) {
@@ -196,7 +198,7 @@ function buildAutomatedAlerts(user) {
     });
   }
 
-  const activeLease = getActiveLeaseForUser(user.id);
+  const activeLease = await getActiveLeaseForUser(user.id);
   if (activeLease?.end_date) {
     const now = new Date();
     const leaseEnd = new Date(activeLease.end_date);
@@ -246,27 +248,27 @@ function paymentMethodsFor(user) {
   ];
 }
 
-function getBillingConfig() {
+async function getBillingConfig() {
   return {
-    rent: Number(getAdminSetting("billing_rent", "0") || 0),
-    water: Number(getAdminSetting("billing_water", "0") || 0),
-    trash: Number(getAdminSetting("billing_trash", "0") || 0),
-    electricity: Number(getAdminSetting("billing_electricity", "0") || 0),
+    rent: Number((await getAdminSetting("billing_rent", "0")) || 0),
+    water: Number((await getAdminSetting("billing_water", "0")) || 0),
+    trash: Number((await getAdminSetting("billing_trash", "0")) || 0),
+    electricity: Number((await getAdminSetting("billing_electricity", "0")) || 0),
   };
 }
 
-function getOccupancyConfig() {
-  const occupied = Number(getAdminSetting("occupied_units_manual", "") || NaN);
-  const vacant = Number(getAdminSetting("vacant_units_manual", "") || NaN);
+async function getOccupancyConfig() {
+  const occupied = Number((await getAdminSetting("occupied_units_manual", "")) || NaN);
+  const vacant = Number((await getAdminSetting("vacant_units_manual", "")) || NaN);
   return {
     occupied_units: Number.isFinite(occupied) ? occupied : null,
     vacant_units: Number.isFinite(vacant) ? vacant : null,
   };
 }
 
-function getPortfolioOverviewWithOverrides() {
-  const base = getPortfolioOverview();
-  const occupancy = getOccupancyConfig();
+async function getPortfolioOverviewWithOverrides() {
+  const base = await getPortfolioOverview();
+  const occupancy = await getOccupancyConfig();
   const occupied = occupancy.occupied_units ?? base.occupied_units;
   const vacant = occupancy.vacant_units ?? base.vacant_units;
   return {
@@ -277,8 +279,8 @@ function getPortfolioOverviewWithOverrides() {
   };
 }
 
-function getTenantBillBreakdown(user) {
-  const config = getBillingConfig();
+async function getTenantBillBreakdown(user) {
+  const config = await getBillingConfig();
   const breakdown = {
     rent: Number(user.rent_balance ?? user.rent ?? config.rent ?? 0),
     water: Number(user.water_balance ?? user.bill ?? config.water ?? 0),
@@ -310,8 +312,13 @@ function parseNonNegativeMoney(value, fieldName) {
   return String(amount);
 }
 
-function getExpectedCollectionTotal(users = listUsers()) {
-  return users.reduce((sum, user) => sum + getTenantBillBreakdown(user).total, 0);
+async function getExpectedCollectionTotal(users = null) {
+  const resolvedUsers = users || (await listUsers());
+  let total = 0;
+  for (const user of resolvedUsers) {
+    total += (await getTenantBillBreakdown(user)).total;
+  }
+  return total;
 }
 
 
@@ -357,7 +364,7 @@ function requireAdminSession(req, res, next) {
   next();
 }
 
-function validateAuth(req, res) {
+async function validateAuth(req, res) {
   const token =
     req.header("token") ||
     req.header("x-access-token") ||
@@ -368,7 +375,7 @@ function validateAuth(req, res) {
     return null;
   }
 
-  const user = getUserByTenantId(tenantId);
+  const user = await getUserByTenantId(tenantId);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" });
     return null;
@@ -384,37 +391,37 @@ function validateAuth(req, res) {
 
 createEncryptedBackup();
 
-app.post("/api/pegasus/visionary/tenant/app/login", (req, res) => {
+app.post("/api/pegasus/visionary/tenant/app/login", asyncHandler(async (req, res) => {
   const { first_name, account_number } = req.body || {};
   if (!first_name || !account_number) {
     return res.status(400).json({ error: "Missing credentials" });
   }
 
-  const user = getUserByFirstName(first_name);
+  const user = await getUserByFirstName(first_name);
   if (!user || !verifyPassword(account_number, user.account_number_hash)) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
   const access_token = crypto.randomBytes(24).toString("hex");
-  updateUserToken(user.id, access_token);
+  await updateUserToken(user.id, access_token);
 
-  const refreshedUser = getUserByTenantId(user.tenant_id);
+  const refreshedUser = await getUserByTenantId(user.tenant_id);
   res.json({ ...sanitizeUser(refreshedUser), access_token });
-});
+}));
 
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-app.post("/api/pegasus/visionary/tenant/app/tenantDetails", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/tenantDetails", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
   res.json(sanitizeUser(user));
-});
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/profile/update", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/profile/update", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
-  const updated = updateUserProfile(user.id, {
+  const updated = await updateUserProfile(user.id, {
     first_name: String(req.body?.first_name || user.first_name || "").trim(),
     last_name: String(req.body?.last_name || user.last_name || "").trim(),
     phone_number: String(req.body?.phone_number || user.phone_number || "").trim(),
@@ -423,21 +430,21 @@ app.post("/api/pegasus/visionary/tenant/app/profile/update", (req, res) => {
   });
 
   res.json({ success: true, user: sanitizeUser(updated) });
-});
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/dashboardOverview", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/dashboardOverview", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
-  const lease = getActiveLeaseForUser(user.id);
-  const alerts = [...buildAutomatedAlerts(user), ...listStoredAlertsForUser(user.id)].slice(0, 5);
-  const maintenance = listMaintenanceForUser(user.id);
-  const messages = listMessagesForUser(user.id);
-  const vacateNotices = listVacateNoticesForUser(user.id);
-  const payments = listPaymentRequestsForUser(user.id);
-  const bills = getTenantBillBreakdown(user);
+  const lease = await getActiveLeaseForUser(user.id);
+  const alerts = [...(await buildAutomatedAlerts(user)), ...(await listStoredAlertsForUser(user.id))].slice(0, 5);
+  const maintenance = await listMaintenanceForUser(user.id);
+  const messages = await listMessagesForUser(user.id);
+  const vacateNotices = await listVacateNoticesForUser(user.id);
+  const payments = await listPaymentRequestsForUser(user.id);
+  const bills = await getTenantBillBreakdown(user);
   res.json({
-    portfolio: getPortfolioOverviewWithOverrides(),
+    portfolio: await getPortfolioOverviewWithOverrides(),
     tenant: {
       rent_status: bills.total > 0 ? "Outstanding" : "Current",
       active_lease: Boolean(lease),
@@ -450,27 +457,27 @@ app.post("/api/pegasus/visionary/tenant/app/dashboardOverview", (req, res) => {
     },
     alerts,
   });
-});
+}));
 
-app.post("/api/pegasus/visionary/tenant/get/tenant/arrears", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/get/tenant/arrears", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json(listArrearsForUser(user.id));
-});
+  res.json(await listArrearsForUser(user.id));
+}));
 
-app.post("/api/pegasus/visionary/tenant/get/tenant/transactions", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/get/tenant/transactions", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json(listTransactionsForUser(user.id));
-});
+  res.json(await listTransactionsForUser(user.id));
+}));
 
-app.post("/api/pegasus/visionary/tenant/payments/options", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/payments/options", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  const bills = getTenantBillBreakdown(user);
+  const bills = await getTenantBillBreakdown(user);
   res.json({
     methods: paymentMethodsFor(user),
-    history: listPaymentRequestsForUser(user.id),
+    history: await listPaymentRequestsForUser(user.id),
     bill_breakdown: bills,
     instructions: {
       paybill_number: MPESA_PAYBILL_NUMBER,
@@ -484,22 +491,22 @@ app.post("/api/pegasus/visionary/tenant/payments/options", (req, res) => {
       ],
     },
   });
-});
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/alerts/get", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/alerts/get", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json([...buildAutomatedAlerts(user), ...listStoredAlertsForUser(user.id)]);
-});
+  res.json([...(await buildAutomatedAlerts(user)), ...(await listStoredAlertsForUser(user.id))]);
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/messages/get", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/messages/get", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json({ messages: listMessagesForUser(user.id) });
-});
+  res.json({ messages: await listMessagesForUser(user.id) });
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/messages/send", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/messages/send", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
   const body = String(req.body?.body || "").trim();
@@ -507,7 +514,7 @@ app.post("/api/pegasus/visionary/tenant/app/messages/send", (req, res) => {
     return res.status(400).json({ error: "body is required" });
   }
 
-  addMessage(user.id, {
+  await addMessage(user.id, {
     sender_type: "TENANT",
     sender_name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.first_name,
     subject: req.body?.subject || "Tenant message",
@@ -516,11 +523,11 @@ app.post("/api/pegasus/visionary/tenant/app/messages/send", (req, res) => {
     status: "UNREAD",
   });
 
-  res.json({ success: true, messages: listMessagesForUser(user.id) });
-});
+  res.json({ success: true, messages: await listMessagesForUser(user.id) });
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/AddNotice", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/AddNotice", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
   const moveOutDate = String(req.body?.move_out_date || "").trim();
@@ -528,7 +535,7 @@ app.post("/api/pegasus/visionary/tenant/app/AddNotice", (req, res) => {
     return res.status(400).json({ error: "move_out_date is required" });
   }
 
-  addVacateNotice(user.id, {
+  await addVacateNotice(user.id, {
     move_out_date: moveOutDate,
     reason: req.body?.reason || "",
     forwarding_address: req.body?.forwarding_address || "",
@@ -536,7 +543,7 @@ app.post("/api/pegasus/visionary/tenant/app/AddNotice", (req, res) => {
     status: "Pending",
   });
 
-  addAlert(user.id, {
+  await addAlert(user.id, {
     type: "vacating_notice",
     title: "Vacating notice submitted",
     message: `Your vacating notice for ${moveOutDate} has been received.`,
@@ -544,7 +551,7 @@ app.post("/api/pegasus/visionary/tenant/app/AddNotice", (req, res) => {
     trigger_date: new Date().toISOString(),
   });
 
-  addMessage(user.id, {
+  await addMessage(user.id, {
     sender_type: "SYSTEM",
     sender_name: "Tenancy Desk",
     subject: "Vacating notice received",
@@ -555,38 +562,38 @@ app.post("/api/pegasus/visionary/tenant/app/AddNotice", (req, res) => {
       "Our team will contact you to coordinate inspection and final settlement.\n\nRegards,\nOtic Apartments Team",
   });
 
-  res.json({ success: true, notices: listVacateNoticesForUser(user.id) });
-});
+  res.json({ success: true, notices: await listVacateNoticesForUser(user.id) });
+}));
 
 app.post("/api/pegasus/visionary/authorization/admin/delete/specific/tenant/notices", (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/pegasus/visionary/agreements/fetch", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/agreements/fetch", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  const leases = listLeasesForUser(user.id).map((lease) => ({
+  const leases = (await listLeasesForUser(user.id)).map((lease) => ({
     ...lease,
     agreement_title: lease.lease_name,
   }));
   res.json({ agreements: leases });
-});
+}));
 
-app.post("/api/pegasus/visionary/lease/active", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/lease/active", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  const lease = getActiveLeaseForUser(user.id);
+  const lease = await getActiveLeaseForUser(user.id);
   res.json({ has_active_lease: Boolean(lease), lease_details: lease });
-});
+}));
 
-app.post("/api/pegasus/visionary/lease/history", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/lease/history", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json({ lease_history: listLeasesForUser(user.id) });
-});
+  res.json({ lease_history: await listLeasesForUser(user.id) });
+}));
 
-app.post("/api/pegasus/visionary/mpesa/StkPush", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/mpesa/StkPush", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
   const amount = String(req.body?.amount || user.rent || "0");
@@ -595,7 +602,7 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", (req, res) => {
   const reference = String(req.body?.reference || "").trim() || `MPESA-PENDING-${Date.now()}`;
   const payment_for = String(req.body?.payment_for || "RENT").toUpperCase();
 
-  addPaymentRequest(user.id, {
+  await addPaymentRequest(user.id, {
     method,
     amount,
     phone_number,
@@ -607,7 +614,7 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", (req, res) => {
         `Tenant reported a Paybill payment to ${MPESA_PAYBILL_NUMBER} account ${MPESA_ACCOUNT_NUMBER}.`,
   });
 
-  addAlert(user.id, {
+  await addAlert(user.id, {
     type: "payment",
     title: "Payment submitted for verification",
     message: `Your M-PESA Paybill payment of KES ${Number(amount || 0).toLocaleString()} has been submitted and is awaiting confirmation.`,
@@ -615,7 +622,7 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", (req, res) => {
     trigger_date: new Date().toISOString(),
   });
 
-  addMessage(user.id, {
+  await addMessage(user.id, {
     sender_type: "SYSTEM",
     sender_name: "Billing Desk",
     subject: "Paybill payment submitted",
@@ -636,7 +643,7 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", (req, res) => {
     reference,
     method,
   });
-});
+}));
 
 app.post("/api/pegasus/visionary/tenant/arrear/dirty", (req, res) => {
   res.json({ success: true });
@@ -646,20 +653,20 @@ app.post("/api/pegasus/visionary/tenant/app/tenant/ID/upload", (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/pegasus/visionary/tenant/fetch/documents", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/fetch/documents", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json({ success: true, documents: listDocumentsForUser(user.id) });
-});
+  res.json({ success: true, documents: await listDocumentsForUser(user.id) });
+}));
 
-app.post("/api/pegasus/visionary/tickets/api/tickets/get/tenant", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tickets/api/tickets/get/tenant", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json({ tickets: listMaintenanceForUser(user.id).map(sanitizeTenantMaintenanceTicket) });
-});
+  res.json({ tickets: (await listMaintenanceForUser(user.id)).map(sanitizeTenantMaintenanceTicket) });
+}));
 
-app.post("/api/pegasus/visionary/tickets/api/tickets/create", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tickets/api/tickets/create", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
   const title = String(req.body?.title || "").trim();
@@ -667,7 +674,7 @@ app.post("/api/pegasus/visionary/tickets/api/tickets/create", (req, res) => {
     return res.status(400).json({ error: "title is required" });
   }
 
-  addMaintenanceTicket(user.id, {
+  await addMaintenanceTicket(user.id, {
     title,
     description: req.body?.description || "",
     priority: req.body?.priority || "Medium",
@@ -675,7 +682,7 @@ app.post("/api/pegasus/visionary/tickets/api/tickets/create", (req, res) => {
     technician_name: req.body?.technician_name || null,
   });
 
-  addAlert(user.id, {
+  await addAlert(user.id, {
     type: "maintenance",
     title: "Maintenance request created",
     message: `Your request "${title}" has been logged for follow-up.`,
@@ -683,27 +690,30 @@ app.post("/api/pegasus/visionary/tickets/api/tickets/create", (req, res) => {
     trigger_date: new Date().toISOString(),
   });
 
-  res.json({ success: true, tickets: listMaintenanceForUser(user.id).map(sanitizeTenantMaintenanceTicket) });
-});
+  res.json({ success: true, tickets: (await listMaintenanceForUser(user.id)).map(sanitizeTenantMaintenanceTicket) });
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/security/status", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/security/status", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
 
   res.json({
     encrypted_password_storage: true,
     token_based_auth: true,
-    encrypted_backup: true,
+    encrypted_backup: DATABASE_PROVIDER === "sqlite",
     backups: getBackupStats(),
-    note: "Account passwords are hashed, tokens are validated per session, and local database backups are encrypted with AES-256-GCM.",
+    note:
+      DATABASE_PROVIDER === "sqlite"
+        ? "Account passwords are hashed, tokens are validated per session, and local database backups are encrypted with AES-256-GCM."
+        : "Account passwords are hashed, tokens are validated per session, and Postgres is used as the primary database.",
   });
-});
+}));
 
-app.post("/api/pegasus/visionary/tenant/app/vacating/get", (req, res) => {
-  const user = validateAuth(req, res);
+app.post("/api/pegasus/visionary/tenant/app/vacating/get", asyncHandler(async (req, res) => {
+  const user = await validateAuth(req, res);
   if (!user) return;
-  res.json({ notices: listVacateNoticesForUser(user.id) });
-});
+  res.json({ notices: await listVacateNoticesForUser(user.id) });
+}));
 
 app.post("/api/admin/login", (req, res) => {
   const username = String(req.body?.username || "").trim();
@@ -730,44 +740,45 @@ app.get("/api/admin/session", requireAdminSession, (req, res) => {
   res.json({ authenticated: true, username: req.adminSession.username });
 });
 
-app.get("/api/admin/users", requireAdminSession, (req, res) => {
-  res.json({ users: listUsers().map((user) => sanitizeUser(user)) });
-});
+app.get("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) => {
+  res.json({ users: (await listUsers()).map((user) => sanitizeUser(user)) });
+}));
 
-app.post("/api/admin/users", requireAdminSession, (req, res) => {
+app.post("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) => {
   const { first_name, last_name, account_number, ...rest } = req.body || {};
   if (!first_name || !account_number) {
     return res.status(400).json({ error: "first_name and account_number are required" });
   }
 
   try {
-    const user = createUser({ first_name, last_name, account_number, ...rest });
+    const user = await createUser({ first_name, last_name, account_number, ...rest });
     res.json({ user: sanitizeUser(user) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
-app.delete("/api/admin/users/:tenantId", requireAdminSession, (req, res) => {
-  const user = getUserByTenantId(req.params.tenantId);
+app.delete("/api/admin/users/:tenantId", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserByTenantId(req.params.tenantId);
   if (!user) return res.status(404).json({ error: "User not found" });
-  deleteUserById(user.id);
+  await deleteUserById(user.id);
   res.json({ success: true });
-});
+}));
 
-app.get("/api/admin/overview", requireAdminSession, (req, res) => {
-  const users = listUsers();
+app.get("/api/admin/overview", requireAdminSession, asyncHandler(async (req, res) => {
+  const users = await listUsers();
   const floors = [...new Set(users.map((user) => user.floor_number).filter(Boolean))].sort();
-  const tenantMessages = listAllMessages({ sender_type: "TENANT" });
-  const pendingNotices = users.flatMap((tenant) =>
-    listVacateNoticesForUser(tenant.id).filter((notice) => notice.status === "Pending")
+  const tenantMessages = await listAllMessages({ sender_type: "TENANT" });
+  const pendingNoticesNested = await Promise.all(
+    users.map(async (tenant) => (await listVacateNoticesForUser(tenant.id)).filter((notice) => notice.status === "Pending"))
   );
-  const tickets = listAllMaintenanceTickets();
-  const expectedCollection = Number(getAdminSetting("expected_collection_total", "0") || 0);
-  const acquiredCollection = Number(getAdminSetting("acquired_collection_total", "0") || 0);
+  const pendingNotices = pendingNoticesNested.flat();
+  const tickets = await listAllMaintenanceTickets();
+  const expectedCollection = Number((await getAdminSetting("expected_collection_total", "0")) || 0);
+  const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0);
 
   res.json({
-    overview: getPortfolioOverviewWithOverrides(),
+    overview: await getPortfolioOverviewWithOverrides(),
     security: getBackupStats(),
     stats: {
       total_users: users.length,
@@ -783,9 +794,9 @@ app.get("/api/admin/overview", requireAdminSession, (req, res) => {
     },
     floors,
   });
-});
+}));
 
-app.post("/api/admin/occupancy", requireAdminSession, (req, res) => {
+app.post("/api/admin/occupancy", requireAdminSession, asyncHandler(async (req, res) => {
   const occupied = Number(req.body?.occupied_units ?? NaN);
   const vacant = Number(req.body?.vacant_units ?? NaN);
 
@@ -793,28 +804,28 @@ app.post("/api/admin/occupancy", requireAdminSession, (req, res) => {
     return res.status(400).json({ error: "occupied_units and vacant_units must be non-negative numbers" });
   }
 
-  setAdminSetting("occupied_units_manual", occupied);
-  setAdminSetting("vacant_units_manual", vacant);
+  await setAdminSetting("occupied_units_manual", occupied);
+  await setAdminSetting("vacant_units_manual", vacant);
 
   res.json({
     success: true,
-    overview: getPortfolioOverviewWithOverrides(),
+    overview: await getPortfolioOverviewWithOverrides(),
   });
-});
+}));
 
-app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, (req, res) => {
-  const user = getUserByTenantId(req.params.tenantId);
+app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserByTenantId(req.params.tenantId);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
 
-  const maintenance = listMaintenanceForUser(user.id);
-  const messages = listMessagesForUser(user.id);
-  const notices = listVacateNoticesForUser(user.id);
-  const payments = listPaymentRequestsForUser(user.id);
-  const transactions = listTransactionsForUser(user.id);
-  const arrears = listArrearsForUser(user.id);
-  const lease = getActiveLeaseForUser(user.id);
+  const maintenance = await listMaintenanceForUser(user.id);
+  const messages = await listMessagesForUser(user.id);
+  const notices = await listVacateNoticesForUser(user.id);
+  const payments = await listPaymentRequestsForUser(user.id);
+  const transactions = await listTransactionsForUser(user.id);
+  const arrears = await listArrearsForUser(user.id);
+  const lease = await getActiveLeaseForUser(user.id);
   const totalRepairCost = maintenance.reduce(
     (sum, item) => sum + (isClosedTicketStatus(item.status) ? Number(item.repair_cost || 0) : 0),
     0
@@ -829,7 +840,7 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, (req, res) 
       pending_payments: payments.filter((item) => item.status === "PENDING_CONFIRMATION").length,
       total_repair_cost: totalRepairCost,
     },
-    bills: getTenantBillBreakdown(user),
+    bills: await getTenantBillBreakdown(user),
     lease,
     messages,
     maintenance,
@@ -838,21 +849,21 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, (req, res) 
     transactions,
     arrears,
   });
-});
+}));
 
-app.post("/api/admin/messages", requireAdminSession, (req, res) => {
+app.post("/api/admin/messages", requireAdminSession, asyncHandler(async (req, res) => {
   const tenantId = req.body?.tenant_id;
   const body = String(req.body?.body || "").trim();
   if (!tenantId || !body) {
     return res.status(400).json({ error: "tenant_id and body are required" });
   }
 
-  const user = getUserByTenantId(tenantId);
+  const user = await getUserByTenantId(tenantId);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
 
-  addMessage(user.id, {
+  await addMessage(user.id, {
     sender_type: "ADMIN",
     sender_name: req.body?.sender_name || "Admin",
     subject: req.body?.subject || "Admin message",
@@ -860,25 +871,25 @@ app.post("/api/admin/messages", requireAdminSession, (req, res) => {
     category: req.body?.category || "Admin",
   });
 
-  res.json({ success: true, messages: listMessagesForUser(user.id) });
-});
+  res.json({ success: true, messages: await listMessagesForUser(user.id) });
+}));
 
-app.get("/api/admin/messages/:tenantId", requireAdminSession, (req, res) => {
-  const user = getUserByTenantId(req.params.tenantId);
+app.get("/api/admin/messages/:tenantId", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserByTenantId(req.params.tenantId);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
-  res.json({ messages: listMessagesForUser(user.id) });
-});
+  res.json({ messages: await listMessagesForUser(user.id) });
+}));
 
-app.get("/api/admin/messages", requireAdminSession, (req, res) => {
+app.get("/api/admin/messages", requireAdminSession, asyncHandler(async (req, res) => {
   const senderType = req.query.sender_type ? String(req.query.sender_type) : null;
-  res.json({ messages: listAllMessages({ sender_type: senderType }) });
-});
+  res.json({ messages: await listAllMessages({ sender_type: senderType }) });
+}));
 
-app.get("/api/admin/documents", requireAdminSession, (_req, res) => {
-  res.json({ documents: listSharedDocuments() });
-});
+app.get("/api/admin/documents", requireAdminSession, asyncHandler(async (_req, res) => {
+  res.json({ documents: await listSharedDocuments() });
+}));
 
 app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) => {
   sharedDocumentUpload.single("file")(req, res, (error) => {
@@ -890,7 +901,7 @@ app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) =>
     }
     return next();
   });
-}, (req, res) => {
+}, asyncHandler(async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Choose a file to upload" });
   }
@@ -909,7 +920,7 @@ app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) =>
   const url = `/uploads/${relativePath}`;
 
   try {
-    addSharedDocument({
+    await addSharedDocument({
       name,
       category,
       status,
@@ -926,27 +937,31 @@ app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) =>
 
   res.json({
     success: true,
-    document: listSharedDocuments()[0] || null,
-    documents: listSharedDocuments(),
+    document: (await listSharedDocuments())[0] || null,
+    documents: await listSharedDocuments(),
   });
-});
+}));
 
-app.get("/api/admin/vacating-notices", requireAdminSession, (req, res) => {
-  const notices = listUsers().flatMap((tenant) =>
-    listVacateNoticesForUser(tenant.id).map((notice) => ({
-      ...notice,
-      tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-      tenant_id: tenant.tenant_id,
-      house_number: tenant.house_number,
-      property_name: tenant.property_name,
-    }))
+app.get("/api/admin/vacating-notices", requireAdminSession, asyncHandler(async (req, res) => {
+  const users = await listUsers();
+  const noticesNested = await Promise.all(
+    users.map(async (tenant) =>
+      (await listVacateNoticesForUser(tenant.id)).map((notice) => ({
+        ...notice,
+        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
+        tenant_id: tenant.tenant_id,
+        house_number: tenant.house_number,
+        property_name: tenant.property_name,
+      }))
+    )
   );
+  const notices = noticesNested.flat();
 
   res.json({ notices });
-});
+}));
 
-app.post("/api/admin/vacating-notices/:id/review", requireAdminSession, (req, res) => {
-  const notice = getVacateNoticeById(req.params.id);
+app.post("/api/admin/vacating-notices/:id/review", requireAdminSession, asyncHandler(async (req, res) => {
+  const notice = await getVacateNoticeById(req.params.id);
   if (!notice) {
     return res.status(404).json({ error: "Vacating notice not found" });
   }
@@ -959,25 +974,28 @@ app.post("/api/admin/vacating-notices/:id/review", requireAdminSession, (req, re
     return res.status(400).json({ error: "Vacating notice has already been reviewed" });
   }
 
-  const updated = updateVacateNoticeStatus(notice.id, status, req.body?.review_note || "");
+  const updated = await updateVacateNoticeStatus(notice.id, status, req.body?.review_note || "");
   res.json({ success: true, notice: updated });
-});
+}));
 
-app.get("/api/admin/payments", requireAdminSession, (req, res) => {
-  const users = listUsers();
-  const billing = getBillingConfig();
-  const expectedCollection = Number(getAdminSetting("expected_collection_total", "0") || 0);
-  const acquiredCollection = Number(getAdminSetting("acquired_collection_total", "0") || 0);
-  const paymentItems = users.flatMap((tenant) =>
-    listPaymentRequestsForUser(tenant.id).map((payment) => ({
-      ...payment,
-      tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-      tenant_id: tenant.tenant_id,
-      house_number: tenant.house_number,
-      floor_number: tenant.floor_number,
-      property_name: tenant.property_name,
-    }))
+app.get("/api/admin/payments", requireAdminSession, asyncHandler(async (req, res) => {
+  const users = await listUsers();
+  const billing = await getBillingConfig();
+  const expectedCollection = Number((await getAdminSetting("expected_collection_total", "0")) || 0);
+  const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0);
+  const paymentNested = await Promise.all(
+    users.map(async (tenant) =>
+      (await listPaymentRequestsForUser(tenant.id)).map((payment) => ({
+        ...payment,
+        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
+        tenant_id: tenant.tenant_id,
+        house_number: tenant.house_number,
+        floor_number: tenant.floor_number,
+        property_name: tenant.property_name,
+      }))
+    )
   );
+  const paymentItems = paymentNested.flat();
 
   res.json({
     summary: {
@@ -989,9 +1007,9 @@ app.get("/api/admin/payments", requireAdminSession, (req, res) => {
     billing,
     payments: paymentItems,
   });
-});
+}));
 
-app.post("/api/admin/payments/targets", requireAdminSession, (req, res) => {
+app.post("/api/admin/payments/targets", requireAdminSession, asyncHandler(async (req, res) => {
   const expected = Number(req.body?.expected_collection_total ?? NaN);
   const acquired = Number(req.body?.acquired_collection_total ?? NaN);
 
@@ -999,8 +1017,8 @@ app.post("/api/admin/payments/targets", requireAdminSession, (req, res) => {
     return res.status(400).json({ error: "expected_collection_total and acquired_collection_total must be numbers" });
   }
 
-  setAdminSetting("expected_collection_total", expected);
-  setAdminSetting("acquired_collection_total", acquired);
+  await setAdminSetting("expected_collection_total", expected);
+  await setAdminSetting("acquired_collection_total", acquired);
 
   res.json({
     success: true,
@@ -1010,9 +1028,9 @@ app.post("/api/admin/payments/targets", requireAdminSession, (req, res) => {
       variance: acquired - expected,
     },
   });
-});
+}));
 
-app.post("/api/admin/payments/config", requireAdminSession, (req, res) => {
+app.post("/api/admin/payments/config", requireAdminSession, asyncHandler(async (req, res) => {
   const rent = Number(req.body?.rent ?? NaN);
   const water = Number(req.body?.water ?? NaN);
   const trash = Number(req.body?.trash ?? NaN);
@@ -1028,39 +1046,37 @@ app.post("/api/admin/payments/config", requireAdminSession, (req, res) => {
     return res.status(400).json({ error: "Select at least one tenant to apply bills to" });
   }
 
-  const selectedUsers = tenantIds
-    .map((tenantId) => getUserByTenantId(tenantId))
-    .filter(Boolean);
+  const selectedUsers = (await Promise.all(tenantIds.map((tenantId) => getUserByTenantId(tenantId)))).filter(Boolean);
 
   if (selectedUsers.length !== tenantIds.length) {
     return res.status(400).json({ error: "One or more selected tenants could not be found" });
   }
 
-  setAdminSetting("billing_rent", rent);
-  setAdminSetting("billing_water", water);
-  setAdminSetting("billing_trash", trash);
-  setAdminSetting("billing_electricity", electricity);
-  const users = applyGlobalBilling({
+  await setAdminSetting("billing_rent", rent);
+  await setAdminSetting("billing_water", water);
+  await setAdminSetting("billing_trash", trash);
+  await setAdminSetting("billing_electricity", electricity);
+  const users = await applyGlobalBilling({
     rent,
     water,
     trash,
     electricity,
     userIds: selectedUsers.map((user) => user.id),
   });
-  const expectedTotal = getExpectedCollectionTotal(users);
-  setAdminSetting("expected_collection_total", expectedTotal);
+  const expectedTotal = await getExpectedCollectionTotal(users);
+  await setAdminSetting("expected_collection_total", expectedTotal);
 
   res.json({
     success: true,
-    billing: getBillingConfig(),
+    billing: await getBillingConfig(),
     expected_collection_total: expectedTotal,
     applied_count: selectedUsers.length,
     applied_tenant_ids: tenantIds,
   });
-});
+}));
 
-app.post("/api/admin/payments/:id/review", requireAdminSession, (req, res) => {
-  const payment = getPaymentRequestById(req.params.id);
+app.post("/api/admin/payments/:id/review", requireAdminSession, asyncHandler(async (req, res) => {
+  const payment = await getPaymentRequestById(req.params.id);
   if (!payment) {
     return res.status(404).json({ error: "Payment not found" });
   }
@@ -1074,20 +1090,20 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, (req, res) => {
   }
 
   const reviewNote = String(req.body?.review_note || "").trim();
-  const user = listUsers().find((item) => item.id === payment.user_id);
-  const updated = updatePaymentRequestStatus(payment.id, status, reviewNote);
+  const user = (await listUsers()).find((item) => item.id === payment.user_id);
+  const updated = await updatePaymentRequestStatus(payment.id, status, reviewNote);
 
   if (status === "APPROVED") {
-    const refreshed = adjustUserBalance(payment.user_id, payment.payment_for, payment.amount);
-    const acquiredCollection = Number(getAdminSetting("acquired_collection_total", "0") || 0) + Number(payment.amount || 0);
-    setAdminSetting("acquired_collection_total", acquiredCollection);
-    addTransaction(payment.user_id, {
+    const refreshed = await adjustUserBalance(payment.user_id, payment.payment_for, payment.amount);
+    const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0) + Number(payment.amount || 0);
+    await setAdminSetting("acquired_collection_total", acquiredCollection);
+    await addTransaction(payment.user_id, {
       amount: payment.amount,
       date_created: new Date().toISOString(),
       type: `${payment.payment_for || "Payment"} Payment`,
       description: `Approved ${payment.method} payment ${payment.reference || ""}`.trim(),
     });
-    addMessage(payment.user_id, {
+    await addMessage(payment.user_id, {
       sender_type: "SYSTEM",
       sender_name: "Billing Desk",
       subject: "Payment Approved",
@@ -1100,7 +1116,7 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, (req, res) => {
   }
 
   if (status === "DISAPPROVED") {
-    addMessage(payment.user_id, {
+    await addMessage(payment.user_id, {
       sender_type: "SYSTEM",
       sender_name: "Billing Desk",
       subject: "Payment Not Approved",
@@ -1111,27 +1127,30 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, (req, res) => {
     });
   }
 
-  recalculateUserFinancials(payment.user_id);
+  await recalculateUserFinancials(payment.user_id);
   res.json({ success: true, payment: updated });
-});
+}));
 
-app.get("/api/admin/tickets", requireAdminSession, (req, res) => {
-  const users = listUsers();
-  const tickets = users.flatMap((tenant) =>
-    listMaintenanceForUser(tenant.id).map((ticket) => ({
-      ...ticket,
-      tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-      tenant_id: tenant.tenant_id,
-      house_number: tenant.house_number,
-      floor_number: tenant.floor_number,
-      property_name: tenant.property_name,
-    }))
+app.get("/api/admin/tickets", requireAdminSession, asyncHandler(async (req, res) => {
+  const users = await listUsers();
+  const ticketNested = await Promise.all(
+    users.map(async (tenant) =>
+      (await listMaintenanceForUser(tenant.id)).map((ticket) => ({
+        ...ticket,
+        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
+        tenant_id: tenant.tenant_id,
+        house_number: tenant.house_number,
+        floor_number: tenant.floor_number,
+        property_name: tenant.property_name,
+      }))
+    )
   );
+  const tickets = ticketNested.flat();
 
   res.json({ tickets });
-});
+}));
 
-app.post("/api/admin/tickets/:id/status", requireAdminSession, (req, res) => {
+app.post("/api/admin/tickets/:id/status", requireAdminSession, asyncHandler(async (req, res) => {
   const normalizedStatus = String(req.body?.status || "")
     .trim()
     .toLowerCase()
@@ -1158,7 +1177,7 @@ app.post("/api/admin/tickets/:id/status", requireAdminSession, (req, res) => {
     return res.status(400).json({ error: error.message });
   }
 
-  const ticket = updateMaintenanceTicketStatus(
+  const ticket = await updateMaintenanceTicketStatus(
     req.params.id,
     status,
     req.body?.technician_name || null,
@@ -1169,7 +1188,7 @@ app.post("/api/admin/tickets/:id/status", requireAdminSession, (req, res) => {
   }
 
   res.json({ success: true, ticket });
-});
+}));
 
 app.get("/secure-admin", (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
@@ -1188,6 +1207,21 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use(express.static(__dirname));
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  console.error(error);
+  if (req.path.startsWith("/api/")) {
+    res.status(500).json({ error: error.message || "Internal server error" });
+    return;
+  }
+
+  res.status(500).send("Internal Server Error");
+});
 
 app.use("/api", (req, res) => {
   res.status(404).json({ error: "API endpoint not found" });

@@ -332,21 +332,59 @@ function parseCookies(req) {
   }, {});
 }
 
+function signAdminSessionPayload(payload) {
+  return crypto.createHmac("sha256", BACKUP_SECRET).update(payload).digest("hex");
+}
+
 function createAdminSession(username) {
-  const token = crypto.randomBytes(24).toString("hex");
-  adminSessions.set(token, {
-    username,
-    created_at: new Date().toISOString(),
-  });
-  return token;
+  const payload = Buffer.from(
+    JSON.stringify({
+      username,
+      expires_at: Date.now() + 1000 * 60 * 60 * 12,
+    })
+  ).toString("base64url");
+  const signature = signAdminSessionPayload(payload);
+  return `${payload}.${signature}`;
+}
+
+function getAdminSessionFromToken(token) {
+  const normalized = String(token || "").trim();
+  if (!normalized) return null;
+
+  const legacySession = adminSessions.get(normalized);
+  if (legacySession) {
+    return legacySession;
+  }
+
+  const [payload, signature] = normalized.split(".");
+  if (!payload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = signAdminSessionPayload(payload);
+  const received = Buffer.from(signature, "hex");
+  const expected = Buffer.from(expectedSignature, "hex");
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!parsed?.username || Number(parsed.expires_at || 0) <= Date.now()) {
+      return null;
+    }
+
+    return {
+      username: parsed.username,
+      created_at: new Date(Number(parsed.expires_at) - 1000 * 60 * 60 * 12).toISOString(),
+      expires_at: new Date(Number(parsed.expires_at)).toISOString(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function clearAdminSession(req, res) {
-  const cookies = parseCookies(req);
-  const token = cookies[ADMIN_SESSION_COOKIE];
-  if (token) {
-    adminSessions.delete(token);
-  }
   res.cookie(ADMIN_SESSION_COOKIE, "", {
     ...adminCookieOptions,
     expires: new Date(0),
@@ -356,11 +394,12 @@ function clearAdminSession(req, res) {
 function requireAdminSession(req, res, next) {
   const cookies = parseCookies(req);
   const token = cookies[ADMIN_SESSION_COOKIE];
-  if (!token || !adminSessions.has(token)) {
+  const session = getAdminSessionFromToken(token);
+  if (!session) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  req.adminSession = adminSessions.get(token);
+  req.adminSession = session;
   next();
 }
 

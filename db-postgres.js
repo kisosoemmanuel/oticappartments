@@ -21,11 +21,22 @@ function getSslConfig() {
 
   try {
     const parsed = new URL(connectionString);
+    const hostname = String(parsed.hostname || "").trim().toLowerCase();
     const sslParam = String(parsed.searchParams.get("sslmode") || "").trim().toLowerCase();
+    const sslEnabled = String(parsed.searchParams.get("ssl") || "").trim().toLowerCase();
     if (sslParam === "disable") {
       return false;
     }
+    if (["false", "0", "no"].includes(sslEnabled)) {
+      return false;
+    }
     if (["require", "prefer", "verify-ca", "verify-full"].includes(sslParam)) {
+      return { rejectUnauthorized: false };
+    }
+    if (["true", "1", "yes"].includes(sslEnabled)) {
+      return { rejectUnauthorized: false };
+    }
+    if (hostname.endsWith(".render.com") || hostname.endsWith(".render.internal")) {
       return { rejectUnauthorized: false };
     }
   } catch {

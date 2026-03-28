@@ -13,9 +13,35 @@ if (!connectionString) {
   throw new Error("Set DATABASE_URL to use the Postgres database adapter.");
 }
 
+function getSslConfig() {
+  const sslMode = String(process.env.PGSSLMODE || "").trim().toLowerCase();
+  if (sslMode === "disable") {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(connectionString);
+    const sslParam = String(parsed.searchParams.get("sslmode") || "").trim().toLowerCase();
+    if (sslParam === "disable") {
+      return false;
+    }
+    if (["require", "prefer", "verify-ca", "verify-full"].includes(sslParam)) {
+      return { rejectUnauthorized: false };
+    }
+  } catch {
+    // Fall back to env-driven behavior below.
+  }
+
+  if (["require", "prefer", "verify-ca", "verify-full"].includes(sslMode)) {
+    return { rejectUnauthorized: false };
+  }
+
+  return false;
+}
+
 const pool = new Pool({
   connectionString,
-  ssl: process.env.PGSSLMODE === "disable" ? false : process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: getSslConfig(),
 });
 
 pool.on("error", (error) => {

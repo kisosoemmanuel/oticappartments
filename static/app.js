@@ -390,6 +390,7 @@ function renderSummaryCards(tenant, overview) {
     <div class="summary-grid grid">
       ${summaryCard("Rent Status", tenantStats.rent_status || "Current", tenantStats.rent_status === "Overdue" ? "alert" : "success", "payments")}
       ${summaryCard("Monthly Rent", formatMoney(tenant.rent), "", "payments")}
+      ${summaryCard("Deposit", formatMoney(tenant.deposit), "", "profile")}
       ${summaryCard("Arrears", formatMoney(tenant.arrears), Number(tenant.arrears || 0) > 0 ? "alert" : "", "payments")}
       ${summaryCard("Open Tickets", tenantStats.open_maintenance_count ?? 0, "", "maintenance")}
       ${summaryCard("Unread Messages", tenantStats.unread_messages ?? 0, "", "messages")}
@@ -439,6 +440,10 @@ function renderDashboardView(data) {
           <div class="list-item">
             <div class="meta-label">Unit</div>
             <p class="meta-value">${escapeHtml(tenant.house_number || "Not assigned")}</p>
+          </div>
+          <div class="list-item">
+            <div class="meta-label">Deposit Held</div>
+            <p class="meta-value">${escapeHtml(formatMoney(tenant.deposit || 0))}</p>
           </div>
           <div class="list-item">
             <div class="meta-label">Lease End Date</div>
@@ -843,6 +848,7 @@ function renderView(view, data) {
             ${meta("Tenant ID", tenant.tenant_id)}
             ${meta("Property", tenant.property_name)}
             ${meta("House Number", tenant.house_number)}
+            ${meta("Deposit", formatMoney(tenant.deposit || 0))}
             ${meta("Verification", tenant.id_verification_status)}
           </div>
         </section>

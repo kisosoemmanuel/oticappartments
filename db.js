@@ -43,6 +43,7 @@ export function initDb() {
       email_address TEXT,
       national_id TEXT,
       rent TEXT,
+      deposit TEXT,
       bill TEXT,
       arrears TEXT,
       account_balance TEXT,
@@ -63,6 +64,7 @@ export function initDb() {
   `);
 
   ensureColumn("users", "floor_number", "TEXT");
+  ensureColumn("users", "deposit", "TEXT");
   ensureColumn("users", "rent_balance", "TEXT");
   ensureColumn("users", "water_balance", "TEXT");
   ensureColumn("users", "trash_balance", "TEXT");
@@ -161,11 +163,13 @@ export function initDb() {
       priority TEXT DEFAULT 'Medium',
       status TEXT DEFAULT 'Pending',
       technician_name TEXT,
+      repair_cost TEXT DEFAULT '0',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+  ensureColumn("maintenance_tickets", "repair_cost", "TEXT DEFAULT '0'");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS documents (
@@ -302,6 +306,7 @@ export function createUser({
   email_address,
   national_id,
   rent,
+  deposit,
   bill,
   rent_balance,
   water_balance,
@@ -337,6 +342,7 @@ export function createUser({
       email_address,
       national_id,
       rent,
+      deposit,
       bill,
       rent_balance,
       water_balance,
@@ -367,6 +373,7 @@ export function createUser({
       @email_address,
       @national_id,
       @rent,
+      @deposit,
       @bill,
       @rent_balance,
       @water_balance,
@@ -400,6 +407,7 @@ export function createUser({
     email_address,
     national_id,
     rent,
+    deposit: deposit ?? "0",
     bill,
     rent_balance: rent_balance ?? rent ?? "0",
     water_balance: water_balance ?? bill ?? "0",
@@ -733,16 +741,17 @@ export function listAllMaintenanceTickets() {
     .all();
 }
 
-export function updateMaintenanceTicketStatus(id, status, technician_name = null) {
+export function updateMaintenanceTicketStatus(id, status, technician_name = null, repair_cost = null) {
   db.prepare(
     `
       UPDATE maintenance_tickets
       SET status = ?,
           technician_name = COALESCE(?, technician_name),
+          repair_cost = COALESCE(?, repair_cost),
           updated_at = datetime('now')
       WHERE id = ?
     `
-  ).run(status, technician_name, id);
+  ).run(status, technician_name, repair_cost, id);
 
   return db.prepare("SELECT * FROM maintenance_tickets WHERE id = ? LIMIT 1").get(id) || null;
 }

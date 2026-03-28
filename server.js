@@ -173,6 +173,12 @@ function sanitizeUser(user) {
   return response;
 }
 
+function sanitizeTenantMaintenanceTicket(ticket) {
+  const response = { ...ticket };
+  delete response.repair_cost;
+  return response;
+}
+
 function buildAutomatedAlerts(user) {
   const generated = [];
   const arrearsAmount = Number(user.arrears || 0);
@@ -288,6 +294,20 @@ function getTenantBillBreakdown(user) {
 
 function isClosedTicketStatus(status) {
   return ["Resolved", "Solved"].includes(String(status || "").trim());
+}
+
+function parseNonNegativeMoney(value, fieldName) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return "0";
+  }
+
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error(`${fieldName} must be a non-negative number`);
+  }
+
+  return String(amount);
 }
 
 function getExpectedCollectionTotal(users = listUsers()) {
@@ -635,7 +655,7 @@ app.post("/api/pegasus/visionary/tenant/fetch/documents", (req, res) => {
 app.post("/api/pegasus/visionary/tickets/api/tickets/get/tenant", (req, res) => {
   const user = validateAuth(req, res);
   if (!user) return;
-  res.json({ tickets: listMaintenanceForUser(user.id) });
+  res.json({ tickets: listMaintenanceForUser(user.id).map(sanitizeTenantMaintenanceTicket) });
 });
 
 app.post("/api/pegasus/visionary/tickets/api/tickets/create", (req, res) => {
@@ -663,7 +683,7 @@ app.post("/api/pegasus/visionary/tickets/api/tickets/create", (req, res) => {
     trigger_date: new Date().toISOString(),
   });
 
-  res.json({ success: true, tickets: listMaintenanceForUser(user.id) });
+  res.json({ success: true, tickets: listMaintenanceForUser(user.id).map(sanitizeTenantMaintenanceTicket) });
 });
 
 app.post("/api/pegasus/visionary/tenant/app/security/status", (req, res) => {
@@ -795,6 +815,10 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, (req, res) 
   const transactions = listTransactionsForUser(user.id);
   const arrears = listArrearsForUser(user.id);
   const lease = getActiveLeaseForUser(user.id);
+  const totalRepairCost = maintenance.reduce(
+    (sum, item) => sum + (isClosedTicketStatus(item.status) ? Number(item.repair_cost || 0) : 0),
+    0
+  );
 
   res.json({
     tenant: sanitizeUser(user),
@@ -803,6 +827,7 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, (req, res) 
       open_tickets: maintenance.filter((item) => !isClosedTicketStatus(item.status)).length,
       pending_notices: notices.filter((item) => item.status === "Pending").length,
       pending_payments: payments.filter((item) => item.status === "PENDING_CONFIRMATION").length,
+      total_repair_cost: totalRepairCost,
     },
     bills: getTenantBillBreakdown(user),
     lease,
@@ -1122,7 +1147,23 @@ app.post("/api/admin/tickets/:id/status", requireAdminSession, (req, res) => {
     return res.status(400).json({ error: "Invalid ticket status" });
   }
 
-  const ticket = updateMaintenanceTicketStatus(req.params.id, status, req.body?.technician_name || null);
+  let repairCost = null;
+  try {
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "repair_cost")) {
+      repairCost = parseNonNegativeMoney(req.body?.repair_cost, "repair_cost");
+    } else if (status === "Solved") {
+      repairCost = "0";
+    }
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const ticket = updateMaintenanceTicketStatus(
+    req.params.id,
+    status,
+    req.body?.technician_name || null,
+    repairCost
+  );
   if (!ticket) {
     return res.status(404).json({ error: "Ticket not found" });
   }

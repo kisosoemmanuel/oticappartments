@@ -1,12 +1,34 @@
 # Otic Apartments Portal
 
-This project is a tenant portal and admin console built with Express and SQLite.
+Otic Apartments Portal is a small Node/Express app for running a tenant portal and a simple admin dashboard from the same codebase.
 
-It includes:
-- a tenant-facing portal for payments, messages, alerts, maintenance, notices, leases, documents, and profile updates
-- a separate admin login and admin console for tenant management and operations
+The tenant side is meant for day-to-day self-service. Tenants can check their balance, view transactions, read notices, submit payment confirmations, raise maintenance issues, access documents, send messages, review lease details, and submit vacating notices.
 
-## Local setup
+The admin side is for property operations. Admin users can create tenants, review payment submissions, manage maintenance tickets, send messages, upload shared documents, review move-out notices, apply billing values, and keep an eye on the overall portfolio summary.
+
+It is not trying to be a huge property-management platform. It is closer to a focused internal tool for a small apartment setup.
+
+## What the project uses
+
+- Node.js
+- Express
+- SQLite with `better-sqlite3`
+- Vanilla HTML, CSS, and JavaScript on the frontend
+- `multer` for document uploads
+
+## Main features
+
+- Tenant login with first name and account number
+- Admin login with a cookie-based session
+- Tenant dashboard for rent status, arrears, transactions, and lease info
+- Payment confirmation flow with M-PESA-style payment details
+- Maintenance ticket submission and admin review
+- Tenant/admin messaging
+- Shared document uploads for tenants
+- Vacating notice workflow
+- Encrypted local backup generation
+
+## Running it locally
 
 1. Install dependencies:
 
@@ -20,68 +42,73 @@ npm install
 npm start
 ```
 
-If PowerShell blocks `npm start`, use:
+If PowerShell gives you trouble with `npm start`, use:
 
 ```bash
 npm.cmd start
 ```
 
-Or:
+You can also use:
 
 ```bash
 .\start.cmd
 ```
 
-3. Open the app:
+3. Open the app in your browser:
 
 ```text
 http://localhost:3000
 ```
 
-If port `3000` is busy, the server automatically starts on the next free port and prints the correct URL in the terminal.
+If port `3000` is already taken, the server will try the next available port and print the correct URL in the terminal.
 
-## Empty by default
+## Admin access
 
-The app no longer seeds a demo tenant or demo records.
-
-On a fresh database:
-- the tenant portal starts empty
-- you log into admin first
-- you create real tenant accounts from the admin console
-
-Admin login:
+Admin login page:
 
 ```text
 http://localhost:3000/secure-admin/login
 ```
 
-Admin console:
+Admin dashboard:
 
 ```text
 http://localhost:3000/secure-admin
 ```
 
 Local development defaults:
+
 - Username: `admin`
 - Password: `admin123`
 
-For public deployment, set real values with environment variables before starting the app.
+Those defaults are only meant for local work. In production, set your own values through environment variables.
 
-## Reset all data
+## Fresh database behavior
 
-To wipe the current database records, admin settings, backups, and uploads:
+This project starts empty on purpose. There is no demo tenant preloaded.
 
-```bash
-npm run reset:data
-```
+On a fresh database, the usual flow is:
 
-This is destructive.
+1. Sign in to the admin dashboard
+2. Create one or more tenant accounts
+3. Log in to the tenant portal using the tenant's first name and account number
 
-## Production environment variables
+## Useful scripts
 
-Copy `.env.example` and set at least these values for internet deployment:
+- `npm start` - start the server
+- `npm run reset:data` - wipe the database, admin settings, backups, and uploads
+- `npm run check:syntax` - run a basic syntax check
+- `npm run validate` - run the project validation script
 
-- `NODE_ENV=production`
+`npm run reset:data` is destructive, so use it carefully.
+
+## Environment variables
+
+Copy `.env.example` and update it for your environment.
+
+Current variables:
+
+- `NODE_ENV`
 - `PORT`
 - `APP_BASE_URL`
 - `ADMIN_USERNAME`
@@ -91,112 +118,54 @@ Copy `.env.example` and set at least these values for internet deployment:
 - `BACKUP_DIR`
 - `UPLOAD_DIR`
 
-Notes:
-- In production, the server refuses to start unless `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `BACKUP_SECRET` are set.
-- `DB_PATH` should point to a persistent disk location.
-- `BACKUP_DIR` should also be on persistent storage.
-- `UPLOAD_DIR` should also be on persistent storage so shared documents remain available after restarts.
+Important notes:
 
-## Internet deployment
+- In production, the server will refuse to start unless `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `BACKUP_SECRET` are set.
+- `DB_PATH` should point to persistent storage if you are deploying this for real use.
+- `BACKUP_DIR` should also be persistent.
+- `UPLOAD_DIR` should also be persistent so shared files survive restarts and redeploys.
 
-This app is a long-running Node server with a writable SQLite database.
+## Deployment notes
 
-That means the host must support:
-- a persistent disk or persistent filesystem
+This is a stateful Node app. It uses SQLite and also writes files to disk, so it needs a host that supports:
+
 - a long-running web service
+- persistent storage
 - environment variables
-- one running instance only if SQLite remains the main database
+- a single running instance if you keep SQLite as the main database
 
 Good fits:
+
 - a VPS running Node directly
 - Docker on a VPS
-- a PaaS that supports persistent disks, such as Render
+- a platform like Render with persistent disk support
 
 Poor fits:
-- static-only hosts
-- serverless-only hosts with ephemeral storage
 
-## Render deployment
+- static hosting
+- serverless-only setups with ephemeral storage
 
-A Render Blueprint file is included at:
+The repo includes both a `Dockerfile` and a `render.yaml` file.
 
-```text
-render.yaml
-```
+### Render note
 
-It currently configures:
-- one Node web service on the `free` plan
-- temporary local paths for `DB_PATH`, `BACKUP_DIR`, and `UPLOAD_DIR`
-- `/api/health` as the health check
-- one app instance
+The included Render setup is fine for previewing the app online, but the free tier is not a good long-term home for tenant data.
 
-Suggested deploy flow:
+On Render Free:
 
-1. Push this repo to GitHub.
-2. In Render, create a new Blueprint or Web Service from the repo.
-3. Let Render read `render.yaml`.
-4. Provide values for `APP_BASE_URL`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` during setup.
-5. After the first deploy, connect your custom domain in Render and update `APP_BASE_URL` to that exact HTTPS URL.
+- the service may spin down when idle
+- local SQLite data is not durable
+- uploaded files are not durable
+- backups written to local disk are not durable
 
-The included blueprint assumes the `frankfurt` region as a reasonable default for East Africa, but you can change that before the first deploy if you prefer another region.
+If you want to keep real tenant data, use persistent storage on a paid plan or move the database and file storage to services designed for that.
 
-### Important: Render Free limitations
+## Security and data notes
 
-This current free setup is suitable for previewing the live pages on the internet, but not for durable tenant data.
-
-- The service can spin down after idle time.
-- Local SQLite data, uploaded files, and generated backups are not durable on Render Free.
-- Any restart or redeploy can reset the local database and uploads.
-- This means you should treat the free deployment as a public preview or temporary demo environment.
-
-When you upgrade later, move back to a paid Render service with a persistent disk, or migrate to a hosted database and object storage.
-
-## Docker
-
-A production `Dockerfile` is included.
-
-Build:
-
-```bash
-docker build -t otic-apartments .
-```
-
-Run:
-
-```bash
-docker run -p 3000:3000 ^
-  -e NODE_ENV=production ^
-  -e APP_BASE_URL=https://your-domain.example.com ^
-  -e ADMIN_USERNAME=your-admin ^
-  -e ADMIN_PASSWORD=your-strong-password ^
-  -e BACKUP_SECRET=your-long-random-secret ^
-  -e DB_PATH=/data/data.sqlite ^
-  -e BACKUP_DIR=/data/backups ^
-  -e UPLOAD_DIR=/data/uploads ^
-  -v otic_data:/data ^
-  otic-apartments
-```
-
-## Database files
-
-By default, the app uses:
-
-```text
-data.sqlite
-```
-
-Related WAL files may also appear:
-- `data.sqlite-shm`
-- `data.sqlite-wal`
-
-You can override the database location with `DB_PATH`.
-
-## Security notes
-
-- Tenant authentication uses `first_name` plus `account_number`
-- Admin authentication uses a cookie-based session
+- Tenant account numbers are stored as hashes, not plain text
+- Admin access uses a cookie session
 - In production, the admin cookie is marked `Secure`
-- Encrypted local backups are written to the configured backup folder
+- Local database backups are encrypted with AES-256-GCM before being written to disk
 
 ## Health check
 
@@ -206,4 +175,4 @@ The app exposes:
 /api/health
 ```
 
-Use this as the health check path on your hosting platform.
+If you are deploying behind a platform health check, this is the route to use.

@@ -9,6 +9,7 @@ export const verifyPassword = (...args) => driver.verifyPassword(...args);
 export const generateToken = (...args) => driver.generateToken(...args);
 export const createUser = (...args) => driver.createUser(...args);
 export const getUserByFirstName = (...args) => driver.getUserByFirstName(...args);
+export const listUsersByFirstName = (...args) => driver.listUsersByFirstName(...args);
 export const getUserByTenantId = (...args) => driver.getUserByTenantId(...args);
 export const getUserById = (...args) => driver.getUserById(...args);
 export const updateUserToken = (...args) => driver.updateUserToken(...args);

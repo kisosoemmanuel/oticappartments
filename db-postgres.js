@@ -121,8 +121,7 @@ export async function initDb() {
   `);
 
   await query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_first_name
-    ON users (LOWER(first_name))
+    DROP INDEX IF EXISTS idx_users_first_name
   `);
 
   await ensureColumn("users", "floor_number", "TEXT");
@@ -434,6 +433,11 @@ export async function createUser({
 
 export async function getUserByFirstName(first_name) {
   return getOne("SELECT * FROM users WHERE LOWER(first_name) = LOWER($1) LIMIT 1", [first_name]);
+}
+
+export async function listUsersByFirstName(first_name) {
+  const result = await query("SELECT * FROM users WHERE LOWER(first_name) = LOWER($1) ORDER BY id ASC", [first_name]);
+  return result.rows;
 }
 
 export async function getUserByTenantId(tenant_id) {

@@ -60,7 +60,7 @@ export function initDb() {
   `);
 
   db.exec(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_first_name ON users(LOWER(first_name));
+    DROP INDEX IF EXISTS idx_users_first_name;
   `);
 
   ensureColumn("users", "floor_number", "TEXT");
@@ -430,6 +430,10 @@ export function createUser({
 export function getUserByFirstName(first_name) {
   const stmt = db.prepare("SELECT * FROM users WHERE LOWER(first_name) = LOWER(?) LIMIT 1");
   return stmt.get(first_name) || null;
+}
+
+export function listUsersByFirstName(first_name) {
+  return db.prepare("SELECT * FROM users WHERE LOWER(first_name) = LOWER(?) ORDER BY id ASC").all(first_name);
 }
 
 export function getUserByTenantId(tenant_id) {

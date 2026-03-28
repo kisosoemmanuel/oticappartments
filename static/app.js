@@ -1,7 +1,9 @@
 const app = document.getElementById("app");
 const AUTO_REFRESH_INTERVAL_MS = 10000;
+const TENANT_AUTO_REFRESH_ENABLED = false;
 let tenantAutoRefreshTimer = null;
 let tenantAutoRefreshInFlight = false;
+let tenantDashboardLoadRequestId = 0;
 
 const SESSION_KEY = "oticSession";
 const NAV_ITEMS = [
@@ -118,7 +120,7 @@ async function api(path, { method = "POST", body, auth = true } = {}) {
     data = text;
   }
 
-  if (res.status === 401) {
+  if (res.status === 401 && auth) {
     clearSession();
     navigate("/");
     throw new Error("Session expired. Please sign in again.");
@@ -145,7 +147,7 @@ async function runTenantAutoRefresh() {
 
   tenantAutoRefreshInFlight = true;
   try {
-    await loadDashboardData(getActiveView());
+    await loadDashboardData(getActiveView(), { showLoading: false });
   } catch (error) {
     console.error("Tenant auto-refresh failed:", error);
   } finally {
@@ -155,13 +157,16 @@ async function runTenantAutoRefresh() {
 
 function startTenantAutoRefresh() {
   stopTenantAutoRefresh();
+  if (!TENANT_AUTO_REFRESH_ENABLED) {
+    return;
+  }
   tenantAutoRefreshTimer = window.setInterval(() => {
     runTenantAutoRefresh();
   }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 window.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
+  if (!document.hidden && TENANT_AUTO_REFRESH_ENABLED) {
     runTenantAutoRefresh();
   }
 });
@@ -318,12 +323,15 @@ function activateView(view) {
   });
 }
 
-async function loadDashboardData(view = "dashboard") {
+async function loadDashboardData(view = "dashboard", { showLoading = true } = {}) {
   const content = document.getElementById("content");
   const welcomeCopy = document.getElementById("welcomeCopy");
   const body = getBody();
+  const requestId = ++tenantDashboardLoadRequestId;
 
-  content.innerHTML = `<div class="section"><p class="panel-copy">Loading dashboard data...</p></div>`;
+  if (showLoading) {
+    content.innerHTML = `<div class="section"><p class="panel-copy">Loading dashboard data...</p></div>`;
+  }
 
   try {
     const [
@@ -352,6 +360,10 @@ async function loadDashboardData(view = "dashboard") {
       api("/api/pegasus/visionary/tenant/app/vacating/get", { body }),
     ]);
 
+    if (requestId !== tenantDashboardLoadRequestId) {
+      return;
+    }
+
     const session = getSession();
     setSession({ ...session, ...tenant });
     welcomeCopy.textContent = `Welcome back, ${tenant.first_name || "Tenant"}. Your dashboard now shows only your rent, notices, messages, maintenance, lease, and move-out information.`;
@@ -373,6 +385,9 @@ async function loadDashboardData(view = "dashboard") {
       notices: vacating?.notices || [],
     });
   } catch (error) {
+    if (requestId !== tenantDashboardLoadRequestId) {
+      return;
+    }
     content.innerHTML = `
       <section class="section">
         <h2 class="section-title">Load Error</h2>

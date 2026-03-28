@@ -24,7 +24,6 @@ import {
   getAdminSetting,
   getActiveLeaseForUser,
   getPortfolioOverview,
-  getUserByFirstName,
   getUserByTenantId,
   getVacateNoticeById,
   listArrearsForUser,
@@ -36,6 +35,7 @@ import {
   listMaintenanceForUser,
   listMessagesForUser,
   listPaymentRequestsForUser,
+  listUsersByFirstName,
   listSharedDocuments,
   listStoredAlertsForUser,
   listTransactionsForUser,
@@ -397,8 +397,10 @@ app.post("/api/pegasus/visionary/tenant/app/login", asyncHandler(async (req, res
     return res.status(400).json({ error: "Missing credentials" });
   }
 
-  const user = await getUserByFirstName(first_name);
-  if (!user || !verifyPassword(account_number, user.account_number_hash)) {
+  const user = (await listUsersByFirstName(first_name)).find((item) =>
+    verifyPassword(account_number, item.account_number_hash)
+  );
+  if (!user) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 

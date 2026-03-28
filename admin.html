@@ -128,6 +128,7 @@ const identityEl = document.getElementById("identity");
 const AUTO_REFRESH_INTERVAL_MS = 10000;
 let adminAutoRefreshTimer = null;
 let loadAllDataPromise = null;
+let loadAllDataRequestId = 0;
 
 const esc = (value) =>
   String(value ?? "")
@@ -835,12 +836,13 @@ async function loadConversation() {
   setStatus("Conversation loaded.", false);
 }
 
-async function loadAllData() {
-  if (loadAllDataPromise) {
+async function loadAllData({ force = false } = {}) {
+  if (loadAllDataPromise && !force) {
     return loadAllDataPromise;
   }
 
-  loadAllDataPromise = (async () => {
+  const requestId = ++loadAllDataRequestId;
+  const promise = (async () => {
     await ensureSession();
     const visibleTenantId = getVisibleTenantDetailId();
     const [overview, users, documents, messages, notices, tickets, payments] = await Promise.all([
@@ -852,6 +854,10 @@ async function loadAllData() {
       fetchJson("/api/admin/tickets"),
       fetchJson("/api/admin/payments"),
     ]);
+
+    if (requestId !== loadAllDataRequestId) {
+      return;
+    }
 
     state.overview = overview;
     state.users = users.users || [];
@@ -876,18 +882,30 @@ async function loadAllData() {
 
     if (visibleTenantId) {
       try {
-        state.tenantDetail = await fetchJson(`/api/admin/tenants/${encodeURIComponent(visibleTenantId)}/details`);
+        const detail = await fetchJson(`/api/admin/tenants/${encodeURIComponent(visibleTenantId)}/details`);
+        if (requestId !== loadAllDataRequestId) {
+          return;
+        }
+        state.tenantDetail = detail;
         renderTenantDetail();
       } catch (error) {
+        if (requestId !== loadAllDataRequestId) {
+          return;
+        }
         closeTenantDetail();
         setStatus(error.message, true);
       }
     }
-  })().finally(() => {
-    loadAllDataPromise = null;
   });
+  loadAllDataPromise = promise;
 
-  return loadAllDataPromise;
+  try {
+    return await promise;
+  } finally {
+    if (loadAllDataPromise === promise) {
+      loadAllDataPromise = null;
+    }
+  }
 }
 
 async function refreshAdminData({ silent = true, force = false } = {}) {
@@ -896,7 +914,7 @@ async function refreshAdminData({ silent = true, force = false } = {}) {
   }
 
   try {
-    await loadAllData();
+    await loadAllData({ force });
     if (!silent) {
       setStatus("Admin data refreshed.", false);
     }
@@ -942,7 +960,7 @@ async function createUser(event) {
     }),
   });
   document.getElementById("createUserForm").reset();
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus("User created successfully.", false);
 }
 
@@ -961,7 +979,7 @@ async function sendMessage(event) {
   });
   document.getElementById("messageSubject").value = "";
   document.getElementById("messageBody").value = "";
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus("System message sent.", false);
 }
 
@@ -1002,7 +1020,7 @@ async function uploadSharedDocument(event) {
   document.getElementById("sharedDocumentForm").reset();
   document.getElementById("sharedDocumentCategory").value = "General";
   document.getElementById("sharedDocumentStatus").value = "AVAILABLE";
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus("Shared document uploaded for all tenants.", false);
 }
 
@@ -1016,7 +1034,7 @@ async function savePaymentTargets(event) {
       acquired_collection_total: document.getElementById("acquiredCollection").value,
     }),
   });
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus("Payment totals saved.", false);
 }
 
@@ -1038,7 +1056,7 @@ async function saveBillingConfig(event) {
     }),
   });
 
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus(`Bill values applied to ${result.applied_count || state.billingSelection.length} selected tenant(s).`, false);
 }
 
@@ -1052,13 +1070,13 @@ async function saveOccupancy(event) {
       vacant_units: document.getElementById("vacantUnitsInput").value,
     }),
   });
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus("Occupancy updated.", false);
 }
 
 async function deleteUser(id) {
   await fetchJson(`/api/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" });
-  await loadAllData();
+  await loadAllData({ force: true });
   setStatus("User deleted.", false);
 }
 
@@ -1147,7 +1165,7 @@ document.getElementById("noticeList").addEventListener("click", async (event) =>
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: button.dataset.status }),
     });
-    await loadAllData();
+    await loadAllData({ force: true });
     setStatus("Vacating notice reviewed.", false);
   } catch (error) {
     setStatus(error.message, true);
@@ -1174,7 +1192,7 @@ document.getElementById("ticketList").addEventListener("click", async (event) =>
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    await loadAllData();
+    await loadAllData({ force: true });
     setStatus(
       button.dataset.status === "Solved"
         ? "Ticket solved, repair cost saved, and cleared from the open list."
@@ -1194,7 +1212,7 @@ document.getElementById("paymentList").addEventListener("click", async (event) =
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: button.dataset.status }),
     });
-    await loadAllData();
+    await loadAllData({ force: true });
     setStatus(`Payment ${button.dataset.status === "APPROVED" ? "approved" : "disapproved"}.`, false);
   } catch (error) {
     setStatus(error.message, true);

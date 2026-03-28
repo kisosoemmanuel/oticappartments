@@ -324,10 +324,15 @@ export async function initDb() {
   await query(`
     UPDATE users
     SET
-      rent_balance = COALESCE(rent_balance, rent, '0'),
-      water_balance = COALESCE(water_balance, bill, '0'),
-      trash_balance = COALESCE(trash_balance, '0'),
-      electricity_balance = COALESCE(electricity_balance, '0')
+      deposit = COALESCE(NULLIF(BTRIM(deposit), ''), '0'),
+      rent = COALESCE(NULLIF(BTRIM(rent), ''), '0'),
+      bill = COALESCE(NULLIF(BTRIM(bill), ''), '0'),
+      arrears = COALESCE(NULLIF(BTRIM(arrears), ''), '0'),
+      account_balance = COALESCE(NULLIF(BTRIM(account_balance), ''), '0'),
+      rent_balance = COALESCE(NULLIF(BTRIM(rent_balance), ''), NULLIF(BTRIM(rent), ''), '0'),
+      water_balance = COALESCE(NULLIF(BTRIM(water_balance), ''), NULLIF(BTRIM(bill), ''), '0'),
+      trash_balance = COALESCE(NULLIF(BTRIM(trash_balance), ''), '0'),
+      electricity_balance = COALESCE(NULLIF(BTRIM(electricity_balance), ''), '0')
   `);
 }
 
@@ -1054,8 +1059,8 @@ export async function getPortfolioOverview() {
         SELECT
           COUNT(*) AS total_tenants,
           SUM(CASE WHEN UPPER(COALESCE(status, state, '')) = 'ACTIVE' THEN 1 ELSE 0 END) AS active_tenants,
-          SUM(CASE WHEN CAST(COALESCE(arrears, '0') AS DOUBLE PRECISION) > 0 THEN 1 ELSE 0 END) AS overdue_tenants,
-          SUM(CASE WHEN CAST(COALESCE(arrears, '0') AS DOUBLE PRECISION) <= 0 THEN 1 ELSE 0 END) AS current_tenants
+          SUM(CASE WHEN CAST(COALESCE(NULLIF(BTRIM(arrears), ''), '0') AS DOUBLE PRECISION) > 0 THEN 1 ELSE 0 END) AS overdue_tenants,
+          SUM(CASE WHEN CAST(COALESCE(NULLIF(BTRIM(arrears), ''), '0') AS DOUBLE PRECISION) <= 0 THEN 1 ELSE 0 END) AS current_tenants
         FROM users
       `
     )) || {};

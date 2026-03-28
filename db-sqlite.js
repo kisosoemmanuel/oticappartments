@@ -274,10 +274,15 @@ export function initDb() {
   db.exec(`
     UPDATE users
     SET
-      rent_balance = COALESCE(rent_balance, rent, '0'),
-      water_balance = COALESCE(water_balance, bill, '0'),
-      trash_balance = COALESCE(trash_balance, '0'),
-      electricity_balance = COALESCE(electricity_balance, '0')
+      deposit = COALESCE(NULLIF(TRIM(deposit), ''), '0'),
+      rent = COALESCE(NULLIF(TRIM(rent), ''), '0'),
+      bill = COALESCE(NULLIF(TRIM(bill), ''), '0'),
+      arrears = COALESCE(NULLIF(TRIM(arrears), ''), '0'),
+      account_balance = COALESCE(NULLIF(TRIM(account_balance), ''), '0'),
+      rent_balance = COALESCE(NULLIF(TRIM(rent_balance), ''), NULLIF(TRIM(rent), ''), '0'),
+      water_balance = COALESCE(NULLIF(TRIM(water_balance), ''), NULLIF(TRIM(bill), ''), '0'),
+      trash_balance = COALESCE(NULLIF(TRIM(trash_balance), ''), '0'),
+      electricity_balance = COALESCE(NULLIF(TRIM(electricity_balance), ''), '0')
   `);
 }
 
@@ -1020,8 +1025,8 @@ export function getPortfolioOverview() {
         SELECT
           COUNT(*) AS total_tenants,
           SUM(CASE WHEN UPPER(COALESCE(status, state, '')) = 'ACTIVE' THEN 1 ELSE 0 END) AS active_tenants,
-          SUM(CASE WHEN CAST(COALESCE(arrears, '0') AS REAL) > 0 THEN 1 ELSE 0 END) AS overdue_tenants,
-          SUM(CASE WHEN CAST(COALESCE(arrears, '0') AS REAL) <= 0 THEN 1 ELSE 0 END) AS current_tenants
+          SUM(CASE WHEN CAST(COALESCE(NULLIF(TRIM(arrears), ''), '0') AS REAL) > 0 THEN 1 ELSE 0 END) AS overdue_tenants,
+          SUM(CASE WHEN CAST(COALESCE(NULLIF(TRIM(arrears), ''), '0') AS REAL) <= 0 THEN 1 ELSE 0 END) AS current_tenants
         FROM users
       `)
       .get() || {};

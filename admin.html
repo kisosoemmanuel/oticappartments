@@ -948,7 +948,7 @@ async function loadAllData({ force = false } = {}) {
     } else {
       setStatus("", false);
     }
-  });
+  })();
   loadAllDataPromise = promise;
 
   try {

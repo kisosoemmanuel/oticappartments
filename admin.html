@@ -872,50 +872,21 @@ async function loadAllData({ force = false } = {}) {
 
   const requestId = ++loadAllDataRequestId;
   const promise = (async () => {
-    await ensureSession();
     const visibleTenantId = getVisibleTenantDetailId();
-    const sections = [
-      { key: "overview", label: "overview", request: () => fetchJson("/api/admin/overview"), fallback: null },
-      { key: "users", label: "tenants", request: () => fetchJson("/api/admin/users"), fallback: { users: [] } },
-      { key: "documents", label: "documents", request: () => fetchJson("/api/admin/documents"), fallback: { documents: [] } },
-      { key: "messages", label: "messages", request: () => fetchJson("/api/admin/messages"), fallback: { messages: [] } },
-      { key: "notices", label: "vacating notices", request: () => fetchJson("/api/admin/vacating-notices"), fallback: { notices: [] } },
-      { key: "tickets", label: "tickets", request: () => fetchJson("/api/admin/tickets"), fallback: { tickets: [] } },
-      {
-        key: "payments",
-        label: "payments",
-        request: () => fetchJson("/api/admin/payments"),
-        fallback: { summary: {}, billing: {}, payments: [] },
-      },
-    ];
-    const results = await Promise.allSettled(sections.map((section) => section.request()));
+    const payload = await fetchJson("/api/admin/bootstrap");
 
     if (requestId !== loadAllDataRequestId) {
       return;
     }
 
-    const payloads = {};
-    const failures = [];
-
-    sections.forEach((section, index) => {
-      const result = results[index];
-      if (result.status === "fulfilled") {
-        payloads[section.key] = result.value;
-        return;
-      }
-
-      payloads[section.key] = section.fallback;
-      failures.push(section.label);
-      console.error(`Admin section failed to load: ${section.key}`, result.reason);
-    });
-
-    state.overview = payloads.overview;
-    state.users = payloads.users?.users || [];
-    state.documents = payloads.documents?.documents || [];
-    state.messages = payloads.messages?.messages || [];
-    state.notices = payloads.notices?.notices || [];
-    state.tickets = payloads.tickets?.tickets || [];
-    state.payments = payloads.payments || { summary: {}, billing: {}, payments: [] };
+    identityEl.textContent = `Signed in as ${payload.username || "Admin"}`;
+    state.overview = payload.overview || null;
+    state.users = payload.users?.users || [];
+    state.documents = payload.documents?.documents || [];
+    state.messages = payload.messages?.messages || [];
+    state.notices = payload.notices?.notices || [];
+    state.tickets = payload.tickets?.tickets || [];
+    state.payments = payload.payments || { summary: {}, billing: {}, payments: [] };
 
     syncBillingSelection();
     fillFloorSelect();
@@ -947,8 +918,10 @@ async function loadAllData({ force = false } = {}) {
       }
     }
 
-    if (failures.length) {
-      setStatus(`Some admin sections could not be loaded: ${failures.join(", ")}.`, true);
+    if (payload.failures?.length) {
+      setStatus(`Some admin sections could not be loaded: ${payload.failures.join(", ")}.`, true);
+    } else {
+      setStatus("", false);
     }
   });
   loadAllDataPromise = promise;

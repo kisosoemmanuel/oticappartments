@@ -32,6 +32,7 @@ import {
   listDocumentsForUser,
   listLeasesForUser,
   listAllMessages,
+  listAllVacateNotices,
   listMaintenanceForUser,
   listMessagesForUser,
   listPaymentRequestsForUser,
@@ -276,6 +277,13 @@ async function getPortfolioOverviewWithOverrides() {
     occupied_units: occupied,
     vacant_units: vacant,
     total_units: occupied + vacant,
+  };
+}
+
+function buildAdminDatabaseMeta() {
+  return {
+    database_provider: DATABASE_PROVIDER,
+    storage_label: DATABASE_PROVIDER === "postgres" ? "Postgres" : "SQLite",
   };
 }
 
@@ -821,29 +829,39 @@ app.delete("/api/admin/users/:tenantId", requireAdminSession, asyncHandler(async
 }));
 
 async function buildAdminUsersPayload() {
-  return { users: (await listUsers()).map((user) => sanitizeUser(user)) };
+  return buildAdminUsersPayloadFromUsers(await listUsers());
 }
 
-async function buildAdminOverviewPayload() {
-  const users = await listUsers();
-  const floors = [...new Set(users.map((user) => user.floor_number).filter(Boolean))].sort();
-  const tenantMessages = await listAllMessages({ sender_type: "TENANT" });
-  const pendingNoticesNested = await Promise.all(
-    users.map(async (tenant) => (await listVacateNoticesForUser(tenant.id)).filter((notice) => notice.status === "Pending"))
-  );
-  const pendingNotices = pendingNoticesNested.flat();
-  const tickets = await listAllMaintenanceTickets();
-  const expectedCollection = Number((await getAdminSetting("expected_collection_total", "0")) || 0);
-  const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0);
+function buildAdminUserDirectory(users) {
+  return new Map(users.map((user) => [String(user.id), user]));
+}
+
+function buildAdminUsersPayloadFromUsers(users) {
+  return { users: users.map((user) => sanitizeUser(user)) };
+}
+
+async function buildAdminOverviewPayload(users = null) {
+  const resolvedUsers = users || (await listUsers());
+  const floors = [...new Set(resolvedUsers.map((user) => user.floor_number).filter(Boolean))].sort();
+  const [tenantMessages, notices, tickets, expectedCollectionRaw, acquiredCollectionRaw, overview] = await Promise.all([
+    listAllMessages({ sender_type: "TENANT" }),
+    listAllVacateNotices(),
+    listAllMaintenanceTickets(),
+    getAdminSetting("expected_collection_total", "0"),
+    getAdminSetting("acquired_collection_total", "0"),
+    getPortfolioOverviewWithOverrides(),
+  ]);
+  const expectedCollection = Number(expectedCollectionRaw || 0);
+  const acquiredCollection = Number(acquiredCollectionRaw || 0);
 
   return {
-    overview: await getPortfolioOverviewWithOverrides(),
+    overview,
     security: getBackupStats(),
     stats: {
-      total_users: users.length,
+      total_users: resolvedUsers.length,
       total_floors: floors.length,
       tenant_messages: tenantMessages.length,
-      pending_notices: pendingNotices.length,
+      pending_notices: notices.filter((notice) => notice.status === "Pending").length,
       open_tickets: tickets.filter((ticket) => !isClosedTicketStatus(ticket.status)).length,
     },
     payments: {
@@ -863,41 +881,47 @@ async function buildAdminDocumentsPayload() {
   return { documents: await listSharedDocuments() };
 }
 
-async function buildAdminVacatingNoticesPayload() {
-  const users = await listUsers();
-  const noticesNested = await Promise.all(
-    users.map(async (tenant) =>
-      (await listVacateNoticesForUser(tenant.id)).map((notice) => ({
-        ...notice,
-        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-        tenant_id: tenant.tenant_id,
-        house_number: tenant.house_number,
-        property_name: tenant.property_name,
-      }))
-    )
-  );
+async function buildAdminVacatingNoticesPayload(users = null) {
+  const resolvedUsers = users || (await listUsers());
+  const userDirectory = buildAdminUserDirectory(resolvedUsers);
+  const notices = await listAllVacateNotices();
 
-  return { notices: noticesNested.flat() };
+  return {
+    notices: notices.map((notice) => {
+      const tenant = userDirectory.get(String(notice.user_id)) || {};
+      return {
+        ...notice,
+        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name || "Tenant",
+        tenant_id: tenant.tenant_id || null,
+        house_number: tenant.house_number || null,
+        property_name: tenant.property_name || null,
+      };
+    }),
+  };
 }
 
-async function buildAdminPaymentsPayload() {
-  const users = await listUsers();
-  const billing = await getBillingConfig();
-  const expectedCollection = Number((await getAdminSetting("expected_collection_total", "0")) || 0);
-  const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0);
-  const paymentNested = await Promise.all(
-    users.map(async (tenant) =>
-      (await listPaymentRequestsForUser(tenant.id)).map((payment) => ({
-        ...payment,
-        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-        tenant_id: tenant.tenant_id,
-        house_number: tenant.house_number,
-        floor_number: tenant.floor_number,
-        property_name: tenant.property_name,
-      }))
-    )
-  );
-  const paymentItems = paymentNested.flat();
+async function buildAdminPaymentsPayload(users = null) {
+  const resolvedUsers = users || (await listUsers());
+  const userDirectory = buildAdminUserDirectory(resolvedUsers);
+  const [billing, expectedCollectionRaw, acquiredCollectionRaw, payments] = await Promise.all([
+    getBillingConfig(),
+    getAdminSetting("expected_collection_total", "0"),
+    getAdminSetting("acquired_collection_total", "0"),
+    listAllPaymentRequests(),
+  ]);
+  const expectedCollection = Number(expectedCollectionRaw || 0);
+  const acquiredCollection = Number(acquiredCollectionRaw || 0);
+  const paymentItems = payments.map((payment) => {
+    const tenant = userDirectory.get(String(payment.user_id)) || {};
+    return {
+      ...payment,
+      tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name || "Tenant",
+      tenant_id: tenant.tenant_id || null,
+      house_number: tenant.house_number || null,
+      floor_number: tenant.floor_number || null,
+      property_name: tenant.property_name || null,
+    };
+  });
 
   return {
     summary: {
@@ -911,29 +935,38 @@ async function buildAdminPaymentsPayload() {
   };
 }
 
-async function buildAdminTicketsPayload() {
-  const users = await listUsers();
-  const ticketNested = await Promise.all(
-    users.map(async (tenant) =>
-      (await listMaintenanceForUser(tenant.id)).map((ticket) => ({
-        ...ticket,
-        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-        tenant_id: tenant.tenant_id,
-        house_number: tenant.house_number,
-        floor_number: tenant.floor_number,
-        property_name: tenant.property_name,
-      }))
-    )
-  );
+async function buildAdminTicketsPayload(users = null) {
+  const resolvedUsers = users || (await listUsers());
+  const userDirectory = buildAdminUserDirectory(resolvedUsers);
+  const tickets = await listAllMaintenanceTickets();
 
-  return { tickets: ticketNested.flat() };
+  return {
+    tickets: tickets.map((ticket) => {
+      const tenant = userDirectory.get(String(ticket.user_id)) || {};
+      return {
+        ...ticket,
+        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name || "Tenant",
+        tenant_id: tenant.tenant_id || null,
+        house_number: tenant.house_number || null,
+        floor_number: tenant.floor_number || null,
+        property_name: tenant.property_name || null,
+      };
+    }),
+  };
 }
 
 async function buildAdminBootstrapPayload(username) {
+  let users = null;
+  try {
+    users = await listUsers();
+  } catch (error) {
+    console.error("Admin bootstrap user prefetch failed:", error);
+  }
+
   const sections = [
     {
       key: "overview",
-      build: () => buildAdminOverviewPayload(),
+      build: () => buildAdminOverviewPayload(users),
       fallback: {
         overview: { total_units: 0, occupied_units: 0, vacant_units: 0, active_leases: 0, overdue_tenants: 0, rent_collection_rate: 0 },
         security: { backup_count: 0, last_backup_at: null },
@@ -942,29 +975,32 @@ async function buildAdminBootstrapPayload(username) {
         floors: [],
       },
     },
-    { key: "users", build: () => buildAdminUsersPayload(), fallback: { users: [] } },
+    { key: "users", build: () => (users ? buildAdminUsersPayloadFromUsers(users) : buildAdminUsersPayload()), fallback: { users: [] } },
     { key: "documents", build: () => buildAdminDocumentsPayload(), fallback: { documents: [] } },
     { key: "messages", build: () => buildAdminMessagesPayload(), fallback: { messages: [] } },
-    { key: "notices", build: () => buildAdminVacatingNoticesPayload(), fallback: { notices: [] } },
-    { key: "tickets", build: () => buildAdminTicketsPayload(), fallback: { tickets: [] } },
-    { key: "payments", build: () => buildAdminPaymentsPayload(), fallback: { summary: {}, billing: {}, payments: [] } },
+    { key: "notices", build: () => buildAdminVacatingNoticesPayload(users), fallback: { notices: [] } },
+    { key: "tickets", build: () => buildAdminTicketsPayload(users), fallback: { tickets: [] } },
+    { key: "payments", build: () => buildAdminPaymentsPayload(users), fallback: { summary: {}, billing: {}, payments: [] } },
   ];
 
   const response = {
     authenticated: true,
     username,
+    meta: buildAdminDatabaseMeta(),
     failures: [],
   };
 
-  for (const section of sections) {
-    try {
-      response[section.key] = await section.build();
-    } catch (error) {
-      console.error(`Admin bootstrap failed for ${section.key}:`, error);
-      response[section.key] = section.fallback;
-      response.failures.push(section.key);
-    }
-  }
+  await Promise.all(
+    sections.map(async (section) => {
+      try {
+        response[section.key] = await section.build();
+      } catch (error) {
+        console.error(`Admin bootstrap failed for ${section.key}:`, error);
+        response[section.key] = section.fallback;
+        response.failures.push(section.key);
+      }
+    })
+  );
 
   return response;
 }
@@ -1386,7 +1422,10 @@ app.get("/admin", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    database_provider: DATABASE_PROVIDER,
+  });
 });
 
 app.use(express.static(__dirname));

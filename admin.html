@@ -112,6 +112,7 @@ textarea{min-height:120px;resize:vertical}
 <script>
 const state = {
   overview: null,
+  meta: {},
   users: [],
   messages: [],
   notices: [],
@@ -228,7 +229,7 @@ function shouldPauseAutoRefresh() {
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 15000);
+  const timeout = window.setTimeout(() => controller.abort(), Number(options.timeoutMs || 30000));
   let response;
   const headers = new Headers(options.headers || {});
   const adminToken = getAdminSessionToken();
@@ -385,8 +386,31 @@ function filteredTenants() {
   });
 }
 
+function buildTenantListEmptyState() {
+  const provider = String(state.meta?.database_provider || "").trim().toLowerCase();
+  if (provider === "postgres") {
+    return `<div class="item">
+      <strong>No tenants found in the deployed Postgres database.</strong>
+      <div class="muted">If your records were created locally in SQLite, they do not sync automatically. Run <code>npm run migrate:sqlite-to-postgres</code> against the same Render Postgres database, then refresh this page.</div>
+    </div>`;
+  }
+
+  return `<div class="item">
+    <strong>No tenants yet.</strong>
+    <div class="muted">Create the first tenant from the form on this page to populate the admin dashboard.</div>
+  </div>`;
+}
+
+function buildTenantPreviewEmptyState() {
+  if (state.users.length) {
+    return '<div class="item">Choose a tenant to preview their record.</div>';
+  }
+  return buildTenantListEmptyState();
+}
+
 function renderTenants() {
   const users = filteredTenants();
+  const emptyState = state.users.length ? '<div class="item">No tenants match the current filter.</div>' : buildTenantListEmptyState();
   document.getElementById("tenantCards").innerHTML =
     users
       .map((user) => {
@@ -405,7 +429,7 @@ function renderTenants() {
           </div>
         </article>`;
       })
-      .join("") || '<div class="item">No tenants match the current filter.</div>';
+      .join("") || emptyState;
 
   const first = users[0];
   document.getElementById("tenantPreview").innerHTML = first
@@ -415,7 +439,7 @@ function renderTenants() {
         <div class="muted">Floor ${esc(first.floor_number || "-")} | Unit ${esc(first.house_number || "-")}</div>
         <div class="muted">Deposit ${esc(money(first.deposit || 0))}</div>
       </div>`
-    : '<div class="item">Choose a tenant to preview their record.</div>';
+    : buildTenantPreviewEmptyState();
 }
 
 function renderTenantDetail() {
@@ -881,6 +905,7 @@ async function loadAllData({ force = false } = {}) {
 
     identityEl.textContent = `Signed in as ${payload.username || "Admin"}`;
     state.overview = payload.overview || null;
+    state.meta = payload.meta || {};
     state.users = payload.users?.users || [];
     state.documents = payload.documents?.documents || [];
     state.messages = payload.messages?.messages || [];

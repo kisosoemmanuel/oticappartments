@@ -175,6 +175,24 @@ npm run migrate:sqlite-to-postgres
 
 By default, the migration reads from `data.sqlite`. If your SQLite file lives somewhere else, set `SQLITE_DB_PATH` first.
 
+If the deployed admin page opens but shows no tenant data, that usually means the Render app is connected to Postgres while your existing records are still only in local SQLite.
+
+From your own machine:
+
+1. Copy the Render Postgres external database URL from the Render dashboard.
+2. Point `DATABASE_URL` to that external URL.
+3. Run the migration against your local SQLite file.
+
+PowerShell example:
+
+```powershell
+$env:DATABASE_URL="postgresql://user:password@host:5432/database"
+$env:SQLITE_DB_PATH=".\data.sqlite"
+npm run migrate:sqlite-to-postgres
+```
+
+If you run the migration from inside Render instead, use the internal connection string there. After the migration completes, refresh `/secure-admin`.
+
 ## Security and data notes
 
 - Tenant account numbers are stored as hashes, not plain text

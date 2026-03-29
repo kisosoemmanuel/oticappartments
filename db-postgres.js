@@ -935,6 +935,11 @@ export async function listVacateNoticesForUser(userId) {
   return result.rows;
 }
 
+export async function listAllVacateNotices() {
+  const result = await query("SELECT * FROM vacate_notices ORDER BY created_at DESC, id DESC");
+  return result.rows;
+}
+
 export async function getVacateNoticeById(id) {
   return getOne("SELECT * FROM vacate_notices WHERE id = $1 LIMIT 1", [id]);
 }

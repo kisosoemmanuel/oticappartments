@@ -53,6 +53,7 @@ export const listMessagesForUser = (...args) => driver.listMessagesForUser(...ar
 export const listAllMessages = (...args) => driver.listAllMessages(...args);
 export const addVacateNotice = (...args) => driver.addVacateNotice(...args);
 export const listVacateNoticesForUser = (...args) => driver.listVacateNoticesForUser(...args);
+export const listAllVacateNotices = (...args) => driver.listAllVacateNotices(...args);
 export const getVacateNoticeById = (...args) => driver.getVacateNoticeById(...args);
 export const updateVacateNoticeStatus = (...args) => driver.updateVacateNoticeStatus(...args);
 export const createInvoice = (...args) => driver.createInvoice(...args);

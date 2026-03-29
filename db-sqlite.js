@@ -910,6 +910,12 @@ export function listVacateNoticesForUser(userId) {
     .all(userId);
 }
 
+export function listAllVacateNotices() {
+  return db
+    .prepare("SELECT * FROM vacate_notices ORDER BY datetime(created_at) DESC, id DESC")
+    .all();
+}
+
 export function getVacateNoticeById(id) {
   return db.prepare("SELECT * FROM vacate_notices WHERE id = ? LIMIT 1").get(id) || null;
 }

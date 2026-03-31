@@ -44,6 +44,7 @@ import {
   listVacateNoticesForUser,
   recalculateUserFinancials,
   setAdminSetting,
+  touchUserActivity,
   updateMaintenanceTicketStatus,
   updatePaymentRequestStatus,
   updateUserToken,
@@ -74,6 +75,9 @@ const DOCUMENT_UPLOAD_DIR = path.join(UPLOAD_DIR, "documents");
 const ADMIN_SESSION_COOKIE = "otic_admin_session";
 const MPESA_PAYBILL_NUMBER = "222111";
 const MPESA_ACCOUNT_NUMBER = "024000000880";
+const TENANT_ONLINE_WINDOW_MS = 2 * 60 * 1000;
+const TENANT_RECENT_WINDOW_MS = 30 * 60 * 1000;
+const TENANT_ACTIVITY_TOUCH_WINDOW_MS = 20 * 1000;
 const adminSessions = new Map();
 const adminCookieOptions = {
   httpOnly: true,
@@ -171,9 +175,49 @@ function createEncryptedBackup() {
 }
 
 function sanitizeUser(user) {
-  const response = { ...user };
+  const response = { ...user, ...buildTenantActivityMeta(user) };
   delete response.account_number_hash;
   return response;
+}
+
+function parseTimestamp(value) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+function buildTenantActivityMeta(user) {
+  const lastSeenAt = user?.last_seen_at || null;
+  const lastLoginAt = user?.last_login_at || null;
+  const lastSeenTime = parseTimestamp(lastSeenAt);
+  let activityStatus = "NEVER_SEEN";
+
+  if (lastSeenTime !== null) {
+    const ageMs = Math.max(Date.now() - lastSeenTime, 0);
+    if (ageMs <= TENANT_ONLINE_WINDOW_MS) {
+      activityStatus = "ONLINE";
+    } else if (ageMs <= TENANT_RECENT_WINDOW_MS) {
+      activityStatus = "RECENTLY_ACTIVE";
+    } else {
+      activityStatus = "OFFLINE";
+    }
+  }
+
+  return {
+    last_seen_at: lastSeenAt,
+    last_login_at: lastLoginAt,
+    activity_status: activityStatus,
+    is_online: activityStatus === "ONLINE",
+  };
+}
+
+function shouldTouchTenantActivity(lastSeenAt) {
+  const lastSeenTime = parseTimestamp(lastSeenAt);
+  if (lastSeenTime === null) {
+    return true;
+  }
+
+  return Math.max(Date.now() - lastSeenTime, 0) >= TENANT_ACTIVITY_TOUCH_WINDOW_MS;
 }
 
 function sanitizeTenantMaintenanceTicket(ticket) {
@@ -442,6 +486,10 @@ async function validateAuth(req, res) {
     return null;
   }
 
+  if (shouldTouchTenantActivity(user.last_seen_at)) {
+    return touchUserActivity(user.id);
+  }
+
   return user;
 }
 
@@ -468,7 +516,7 @@ app.post("/api/pegasus/visionary/tenant/app/login", asyncHandler(async (req, res
   const access_token = crypto.randomBytes(24).toString("hex");
   await updateUserToken(user.id, access_token);
 
-  const refreshedUser = await getUserByTenantId(user.tenant_id);
+  const refreshedUser = await touchUserActivity(user.id, { mark_login: true });
   res.json({ ...sanitizeUser(refreshedUser), access_token });
 }));
 

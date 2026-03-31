@@ -249,11 +249,40 @@ async function main() {
     });
     assert.equal(tenantOverview.response.status, 200, "Tenant dashboard overview should load");
 
+    const adminUsersAfterTenantActivity = await request(baseUrl, "/api/admin/users", { cookie: adminCookie });
+    assert.equal(adminUsersAfterTenantActivity.response.status, 200, "Admin users should load after tenant activity");
+    const activeTenant = adminUsersAfterTenantActivity.data.users.find((item) => item.tenant_id === createdTenantId);
+    assert(activeTenant?.last_seen_at, "Admin tenant list should include last seen time");
+    assert.equal(activeTenant?.activity_status, "ONLINE", "Admin tenant list should mark an active tenant as online");
+
     const paymentOptions = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
       method: "POST",
       ...tenantAuth(tenantSession),
     });
     assert.equal(paymentOptions.response.status, 200, "Tenant payments options should load");
+
+    const billingApply = await request(baseUrl, "/api/admin/payments/config", {
+      method: "POST",
+      cookie: adminCookie,
+      body: {
+        rent: "123",
+        water: "0",
+        trash: "0",
+        electricity: "0",
+        tenant_ids: [createdTenantId],
+      },
+    });
+    assert.equal(billingApply.response.status, 200, "Selected-tenant billing update should succeed");
+
+    const tenantPaymentOptionsAfterBilling = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
+      method: "POST",
+      ...tenantAuth(tenantSession),
+    });
+    assert.equal(
+      Number(tenantPaymentOptionsAfterBilling.data.bill_breakdown.total || 0),
+      123,
+      "Tenant should see the billed amount before paying"
+    );
 
     const tenantMessage = await request(baseUrl, "/api/pegasus/visionary/tenant/app/messages/send", {
       method: "POST",
@@ -350,15 +379,24 @@ async function main() {
     });
     assert.equal(paymentReview.response.status, 200, "Admin should approve payment");
 
-    const billingApply = await request(baseUrl, "/api/admin/payments/config", {
-      method: "POST",
+    const adminTenantDetailAfterPayment = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/details`, {
       cookie: adminCookie,
-      body: {
-        ...adminPayments.data.billing,
-        tenant_ids: [createdTenantId],
-      },
     });
-    assert.equal(billingApply.response.status, 200, "Selected-tenant billing update should succeed");
+    assert.equal(
+      Number(adminTenantDetailAfterPayment.data.tenant.account_balance || 0),
+      0,
+      "Admin tenant detail should show a cleared account balance after approval"
+    );
+    assert.equal(
+      Number(adminTenantDetailAfterPayment.data.tenant.arrears || 0),
+      0,
+      "Admin tenant detail should show cleared arrears after approval"
+    );
+    assert.equal(
+      adminTenantDetailAfterPayment.data.arrears.length,
+      0,
+      "Admin tenant detail should not show stale arrears after approval"
+    );
 
     const occupancyUpdate = await request(baseUrl, "/api/admin/occupancy", {
       method: "POST",
@@ -375,6 +413,34 @@ async function main() {
       ...tenantAuth(tenantSession),
     });
     assert.equal(refreshedTenantPayments.response.status, 200, "Tenant should still load payments after admin updates");
+    assert.equal(
+      Number(refreshedTenantPayments.data.bill_breakdown.total || 0),
+      0,
+      "Tenant bill breakdown should be cleared after approved payment"
+    );
+
+    const refreshedTenantDetails = await request(baseUrl, "/api/pegasus/visionary/tenant/app/tenantDetails", {
+      method: "POST",
+      ...tenantAuth(tenantSession),
+    });
+    assert.equal(refreshedTenantDetails.response.status, 200, "Tenant details should still load after admin updates");
+    assert.equal(
+      Number(refreshedTenantDetails.data.account_balance || 0),
+      0,
+      "Tenant details should show a cleared account balance after approved payment"
+    );
+    assert.equal(
+      Number(refreshedTenantDetails.data.arrears || 0),
+      0,
+      "Tenant details should show cleared arrears after approved payment"
+    );
+
+    const refreshedTenantArrears = await request(baseUrl, "/api/pegasus/visionary/tenant/get/tenant/arrears", {
+      method: "POST",
+      ...tenantAuth(tenantSession),
+    });
+    assert.equal(refreshedTenantArrears.response.status, 200, "Tenant arrears endpoint should still load after admin updates");
+    assert.equal(refreshedTenantArrears.data.length, 0, "Tenant arrears feed should clear after approved payment");
 
     const refreshedTenantTickets = await request(baseUrl, "/api/pegasus/visionary/tickets/api/tickets/get/tenant", {
       method: "POST",

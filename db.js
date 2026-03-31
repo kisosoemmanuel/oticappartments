@@ -13,6 +13,7 @@ export const listUsersByFirstName = (...args) => driver.listUsersByFirstName(...
 export const getUserByTenantId = (...args) => driver.getUserByTenantId(...args);
 export const getUserById = (...args) => driver.getUserById(...args);
 export const updateUserToken = (...args) => driver.updateUserToken(...args);
+export const touchUserActivity = (...args) => driver.touchUserActivity(...args);
 export const updateUserProfile = (...args) => driver.updateUserProfile(...args);
 export const listUsers = (...args) => driver.listUsers(...args);
 export const createOrUpdateUnit = (...args) => driver.createOrUpdateUnit(...args);

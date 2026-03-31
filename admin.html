@@ -57,6 +57,9 @@ textarea{min-height:120px;resize:vertical}
 .pill.status-in-progress{background:#fff3cd;color:#9a6700}
 .pill.status-resolved,.pill.status-solved,.pill.status-approved,.pill.status-completed{background:var(--success-soft);color:var(--success)}
 .pill.status-disapproved{background:var(--danger-soft);color:var(--danger)}
+.pill.status-online{background:var(--success-soft);color:var(--success)}
+.pill.status-recently-active{background:var(--warning-soft);color:var(--warning)}
+.pill.status-offline,.pill.status-never-seen{background:#eef2f7;color:#546273}
 .selection-summary{margin:0;color:var(--muted);font-size:13px}
 .selection-list{max-height:290px;overflow:auto;padding-right:4px}
 .check-item{display:flex;gap:12px;align-items:flex-start}
@@ -210,8 +213,38 @@ function formatDateTime(value) {
       });
 }
 
+function humanizeActivityStatus(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "ONLINE") return "Online";
+  if (normalized === "RECENTLY_ACTIVE") return "Recently Active";
+  if (normalized === "OFFLINE") return "Offline";
+  return "Never Seen";
+}
+
+function formatRelativeTime(value) {
+  if (!value) return "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+
+  const diffMs = Math.max(Date.now() - date.getTime(), 0);
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? "" : "s"} ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
 function renderStatusPill(value, label = value) {
   return `<span class="pill status-${statusClass(value)}">${esc(label)}</span>`;
+}
+
+function renderActivityPill(user) {
+  const status = user?.activity_status || "NEVER_SEEN";
+  return renderStatusPill(status, humanizeActivityStatus(status));
 }
 
 function renderRecordCollection(items, emptyMessage) {
@@ -415,13 +448,17 @@ function renderTenants() {
     users
       .map((user) => {
         const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
+        const lastSeen = user.last_seen_at ? `${formatRelativeTime(user.last_seen_at)} | ${formatDateTime(user.last_seen_at)}` : "No activity yet";
+        const lastLogin = user.last_login_at ? formatDateTime(user.last_login_at) : "No login yet";
         return `<article class="item">
           <div class="toolbar">
             <strong>${esc(tenantName)}</strong>
             <span class="pill">Floor ${esc(user.floor_number || "-")}</span>
+            ${renderActivityPill(user)}
           </div>
           <div class="muted">Tenant ID: ${esc(user.tenant_id || "-")}</div>
           <div class="muted">Unit ${esc(user.house_number || "-")} | Phone ${esc(user.phone_number || "-")}</div>
+          <div class="muted">Last seen ${esc(lastSeen)} | Last login ${esc(lastLogin)}</div>
           <div class="muted">Balance ${esc(money(user.account_balance || 0))} | Arrears ${esc(money(user.arrears || 0))} | Deposit ${esc(money(user.deposit || 0))}</div>
           <div class="toolbar" style="margin-top:10px;">
             <button class="btn secondary openTenantBtn" data-tenant="${esc(user.tenant_id)}" type="button">Open Record</button>
@@ -435,8 +472,10 @@ function renderTenants() {
   document.getElementById("tenantPreview").innerHTML = first
     ? `<div class="item">
         <strong>${esc(`${first.first_name || ""} ${first.last_name || ""}`.trim() || first.tenant_id)}</strong>
+        <div class="toolbar" style="margin-top:10px;">${renderActivityPill(first)}</div>
         <div class="muted">Tenant ID: ${esc(first.tenant_id || "-")}</div>
         <div class="muted">Floor ${esc(first.floor_number || "-")} | Unit ${esc(first.house_number || "-")}</div>
+        <div class="muted">Last seen ${esc(first.last_seen_at ? formatRelativeTime(first.last_seen_at) : "No activity yet")}</div>
         <div class="muted">Deposit ${esc(money(first.deposit || 0))}</div>
       </div>`
     : buildTenantPreviewEmptyState();
@@ -459,6 +498,10 @@ function renderTenantDetail() {
   const recentNotices = (detail.notices || []).slice(0, 4);
   const recentArrears = (detail.arrears || []).slice(0, 4);
   const tenantName = `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || "Tenant";
+  const lastSeenSummary = tenant.last_seen_at
+    ? `${formatRelativeTime(tenant.last_seen_at)} | ${formatDateTime(tenant.last_seen_at)}`
+    : "No activity recorded yet";
+  const lastLoginSummary = tenant.last_login_at ? formatDateTime(tenant.last_login_at) : "No tenant login yet";
 
   document.getElementById("tenantDetail").innerHTML = `
     <div class="tenant-detail-shell">
@@ -470,6 +513,12 @@ function renderTenantDetail() {
             <div class="muted">Tenant ID: ${esc(tenant.tenant_id || "-")}</div>
             <div class="muted">Property: ${esc(tenant.property_name || "-")} | Floor ${esc(tenant.floor_number || "-")} | Unit ${esc(tenant.house_number || "-")}</div>
             <div class="muted">Phone: ${esc(tenant.phone_number || "-")} | Joined ${esc(formatDate(tenant.date_created || tenant.created_at))}</div>
+            <div class="toolbar" style="margin-top:12px;">
+              ${renderActivityPill(tenant)}
+              <span class="pill">Last Seen ${esc(tenant.last_seen_at ? formatRelativeTime(tenant.last_seen_at) : "Never")}</span>
+            </div>
+            <div class="muted">Last seen: ${esc(lastSeenSummary)}</div>
+            <div class="muted">Last login: ${esc(lastLoginSummary)}</div>
           </div>
           <div class="item">
             <div class="title">Balance Snapshot</div>
@@ -478,6 +527,7 @@ function renderTenantDetail() {
             <div class="muted">Deposit held: ${esc(money(tenant.deposit || 0))}</div>
             <div class="muted">Current bill total: ${esc(money(bills.total || 0))}</div>
             <div class="muted">Repair total: ${esc(money(detail.summary?.total_repair_cost || 0))}</div>
+            <div class="muted">Presence: ${esc(humanizeActivityStatus(tenant.activity_status || "NEVER_SEEN"))}</div>
           </div>
         </div>
       </section>

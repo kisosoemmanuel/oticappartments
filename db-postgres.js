@@ -130,6 +130,8 @@ export async function initDb() {
   await ensureColumn("users", "water_balance", "TEXT");
   await ensureColumn("users", "trash_balance", "TEXT");
   await ensureColumn("users", "electricity_balance", "TEXT");
+  await ensureColumn("users", "last_seen_at", "TEXT");
+  await ensureColumn("users", "last_login_at", "TEXT");
 
   await query(`
     CREATE TABLE IF NOT EXISTS arrears (
@@ -348,6 +350,54 @@ export function generateToken() {
   return crypto.randomBytes(24).toString("hex");
 }
 
+const FINANCIAL_BALANCE_FIELDS = ["rent_balance", "water_balance", "trash_balance", "electricity_balance"];
+
+function toMoneyNumber(value) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function hasFinancialBreakdown(user) {
+  return FINANCIAL_BALANCE_FIELDS.some((field) => String(user?.[field] ?? "").trim() !== "");
+}
+
+function calculateUserOutstanding(user) {
+  if (!user) return 0;
+  if (!hasFinancialBreakdown(user)) {
+    return Math.max(toMoneyNumber(user.account_balance), toMoneyNumber(user.arrears));
+  }
+
+  return FINANCIAL_BALANCE_FIELDS.reduce((total, field) => total + toMoneyNumber(user[field]), 0);
+}
+
+function withDerivedFinancials(user) {
+  if (!user) return null;
+
+  const outstanding = calculateUserOutstanding(user);
+  return {
+    ...user,
+    account_balance: String(outstanding),
+    arrears: String(outstanding),
+  };
+}
+
+function buildCurrentArrearsRows(user) {
+  const outstanding = calculateUserOutstanding(user);
+  if (!user || outstanding <= 0) {
+    return [];
+  }
+
+  return [
+    {
+      id: `current-${user.id}`,
+      user_id: user.id,
+      description: "Current outstanding balance",
+      balance: String(outstanding),
+      due_date: null,
+    },
+  ];
+}
+
 export async function createUser({
   first_name,
   last_name,
@@ -437,24 +487,34 @@ export async function createUser({
 }
 
 export async function getUserByFirstName(first_name) {
-  return getOne("SELECT * FROM users WHERE LOWER(first_name) = LOWER($1) LIMIT 1", [first_name]);
+  return withDerivedFinancials(await getOne("SELECT * FROM users WHERE LOWER(first_name) = LOWER($1) LIMIT 1", [first_name]));
 }
 
 export async function listUsersByFirstName(first_name) {
   const result = await query("SELECT * FROM users WHERE LOWER(first_name) = LOWER($1) ORDER BY id ASC", [first_name]);
-  return result.rows;
+  return result.rows.map((user) => withDerivedFinancials(user));
 }
 
 export async function getUserByTenantId(tenant_id) {
-  return getOne("SELECT * FROM users WHERE tenant_id = $1 LIMIT 1", [tenant_id]);
+  return withDerivedFinancials(await getOne("SELECT * FROM users WHERE tenant_id = $1 LIMIT 1", [tenant_id]));
 }
 
 export async function getUserById(id) {
-  return getOne("SELECT * FROM users WHERE id = $1 LIMIT 1", [id]);
+  return withDerivedFinancials(await getOne("SELECT * FROM users WHERE id = $1 LIMIT 1", [id]));
 }
 
 export async function updateUserToken(userId, token) {
   await query("UPDATE users SET access_token = $1 WHERE id = $2", [token, userId]);
+}
+
+export async function touchUserActivity(userId, { occurred_at = new Date().toISOString(), mark_login = false } = {}) {
+  if (mark_login) {
+    await query("UPDATE users SET last_seen_at = $1, last_login_at = $2 WHERE id = $3", [occurred_at, occurred_at, userId]);
+  } else {
+    await query("UPDATE users SET last_seen_at = $1 WHERE id = $2", [occurred_at, userId]);
+  }
+
+  return getUserById(userId);
 }
 
 export async function updateUserProfile(
@@ -479,7 +539,7 @@ export async function updateUserProfile(
 
 export async function listUsers() {
   const result = await query("SELECT * FROM users ORDER BY id ASC");
-  return result.rows;
+  return result.rows.map((user) => withDerivedFinancials(user));
 }
 
 export async function createOrUpdateUnit({ unit_code, floor_number = null, status = "VACANT", tenant_id = null, notes = "" }) {
@@ -558,11 +618,7 @@ export async function recalculateUserFinancials(userId) {
   const user = await getUserById(userId);
   if (!user) return null;
 
-  const total =
-    Number(user.rent_balance || 0) +
-    Number(user.water_balance || 0) +
-    Number(user.trash_balance || 0) +
-    Number(user.electricity_balance || 0);
+  const total = calculateUserOutstanding(user);
 
   await query("UPDATE users SET account_balance = $1, arrears = $2 WHERE id = $3", [String(total), String(total), userId]);
   return getUserById(userId);
@@ -657,8 +713,7 @@ export async function addArrear(userId, { description, balance, due_date }) {
 }
 
 export async function listArrearsForUser(userId) {
-  const result = await query("SELECT * FROM arrears WHERE user_id = $1 ORDER BY id ASC", [userId]);
-  return result.rows;
+  return buildCurrentArrearsRows(await getUserById(userId));
 }
 
 export async function addTransaction(userId, { amount, date_created, type, description }) {
@@ -1058,26 +1113,21 @@ export async function setAdminSetting(key, value) {
 }
 
 export async function getPortfolioOverview() {
-  const totals =
-    (await getOne(
-      `
-        SELECT
-          COUNT(*) AS total_tenants,
-          SUM(CASE WHEN UPPER(COALESCE(status, state, '')) = 'ACTIVE' THEN 1 ELSE 0 END) AS active_tenants,
-          SUM(CASE WHEN CAST(COALESCE(NULLIF(BTRIM(arrears), ''), '0') AS DOUBLE PRECISION) > 0 THEN 1 ELSE 0 END) AS overdue_tenants,
-          SUM(CASE WHEN CAST(COALESCE(NULLIF(BTRIM(arrears), ''), '0') AS DOUBLE PRECISION) <= 0 THEN 1 ELSE 0 END) AS current_tenants
-        FROM users
-      `
-    )) || {};
-
+  const users = await listUsers();
+  const activeTenants = users.filter((user) => String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE").length;
+  const overdueTenants = users.filter((user) => calculateUserOutstanding(user) > 0).length;
+  const currentActiveTenants = users.filter((user) => {
+    const isActive = String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE";
+    return isActive && calculateUserOutstanding(user) <= 0;
+  }).length;
   const activeLeases = Number(
     (await getOne("SELECT COUNT(*) AS count FROM leases WHERE UPPER(COALESCE(status, '')) = 'ACTIVE'"))?.count || 0
   );
-  const occupiedUnits = Number(totals.active_tenants || 0);
+  const occupiedUnits = Number(activeTenants || 0);
   const totalUnits = Math.max(occupiedUnits + 2, 6);
   const vacancies = Math.max(totalUnits - occupiedUnits, 0);
   const rentCollectionRate = occupiedUnits
-    ? Math.round((Number(totals.current_tenants || 0) / occupiedUnits) * 100)
+    ? Math.round((Number(currentActiveTenants || 0) / occupiedUnits) * 100)
     : 100;
 
   return {
@@ -1085,7 +1135,7 @@ export async function getPortfolioOverview() {
     occupied_units: occupiedUnits,
     vacant_units: vacancies,
     active_leases: activeLeases,
-    overdue_tenants: Number(totals.overdue_tenants || 0),
+    overdue_tenants: Number(overdueTenants || 0),
     rent_collection_rate: rentCollectionRate,
   };
 }

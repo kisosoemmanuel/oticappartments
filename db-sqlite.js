@@ -69,6 +69,8 @@ export function initDb() {
   ensureColumn("users", "water_balance", "TEXT");
   ensureColumn("users", "trash_balance", "TEXT");
   ensureColumn("users", "electricity_balance", "TEXT");
+  ensureColumn("users", "last_seen_at", "TEXT");
+  ensureColumn("users", "last_login_at", "TEXT");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS arrears (
@@ -298,6 +300,54 @@ export function generateToken() {
   return crypto.randomBytes(24).toString("hex");
 }
 
+const FINANCIAL_BALANCE_FIELDS = ["rent_balance", "water_balance", "trash_balance", "electricity_balance"];
+
+function toMoneyNumber(value) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function hasFinancialBreakdown(user) {
+  return FINANCIAL_BALANCE_FIELDS.some((field) => String(user?.[field] ?? "").trim() !== "");
+}
+
+function calculateUserOutstanding(user) {
+  if (!user) return 0;
+  if (!hasFinancialBreakdown(user)) {
+    return Math.max(toMoneyNumber(user.account_balance), toMoneyNumber(user.arrears));
+  }
+
+  return FINANCIAL_BALANCE_FIELDS.reduce((total, field) => total + toMoneyNumber(user[field]), 0);
+}
+
+function withDerivedFinancials(user) {
+  if (!user) return null;
+
+  const outstanding = calculateUserOutstanding(user);
+  return {
+    ...user,
+    account_balance: String(outstanding),
+    arrears: String(outstanding),
+  };
+}
+
+function buildCurrentArrearsRows(user) {
+  const outstanding = calculateUserOutstanding(user);
+  if (!user || outstanding <= 0) {
+    return [];
+  }
+
+  return [
+    {
+      id: `current-${user.id}`,
+      user_id: user.id,
+      description: "Current outstanding balance",
+      balance: String(outstanding),
+      due_date: null,
+    },
+  ];
+}
+
 export function createUser({
   first_name,
   last_name,
@@ -434,25 +484,38 @@ export function createUser({
 
 export function getUserByFirstName(first_name) {
   const stmt = db.prepare("SELECT * FROM users WHERE LOWER(first_name) = LOWER(?) LIMIT 1");
-  return stmt.get(first_name) || null;
+  return withDerivedFinancials(stmt.get(first_name) || null);
 }
 
 export function listUsersByFirstName(first_name) {
-  return db.prepare("SELECT * FROM users WHERE LOWER(first_name) = LOWER(?) ORDER BY id ASC").all(first_name);
+  return db
+    .prepare("SELECT * FROM users WHERE LOWER(first_name) = LOWER(?) ORDER BY id ASC")
+    .all(first_name)
+    .map((user) => withDerivedFinancials(user));
 }
 
 export function getUserByTenantId(tenant_id) {
   const stmt = db.prepare("SELECT * FROM users WHERE tenant_id = ? LIMIT 1");
-  return stmt.get(tenant_id) || null;
+  return withDerivedFinancials(stmt.get(tenant_id) || null);
 }
 
 export function getUserById(id) {
   const stmt = db.prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
-  return stmt.get(id) || null;
+  return withDerivedFinancials(stmt.get(id) || null);
 }
 
 export function updateUserToken(userId, token) {
   db.prepare("UPDATE users SET access_token = ? WHERE id = ?").run(token, userId);
+}
+
+export function touchUserActivity(userId, { occurred_at = new Date().toISOString(), mark_login = false } = {}) {
+  if (mark_login) {
+    db.prepare("UPDATE users SET last_seen_at = ?, last_login_at = ? WHERE id = ?").run(occurred_at, occurred_at, userId);
+  } else {
+    db.prepare("UPDATE users SET last_seen_at = ? WHERE id = ?").run(occurred_at, userId);
+  }
+
+  return getUserById(userId);
 }
 
 export function updateUserProfile(
@@ -475,7 +538,7 @@ export function updateUserProfile(
 }
 
 export function listUsers() {
-  return db.prepare("SELECT * FROM users ORDER BY id ASC").all();
+  return db.prepare("SELECT * FROM users ORDER BY id ASC").all().map((user) => withDerivedFinancials(user));
 }
 
 export function createOrUpdateUnit({ unit_code, floor_number = null, status = "VACANT", tenant_id = null, notes = "" }) {
@@ -550,11 +613,7 @@ export function recalculateUserFinancials(userId) {
   const user = getUserById(userId);
   if (!user) return null;
 
-  const total =
-    Number(user.rent_balance || 0) +
-    Number(user.water_balance || 0) +
-    Number(user.trash_balance || 0) +
-    Number(user.electricity_balance || 0);
+  const total = calculateUserOutstanding(user);
 
   db.prepare("UPDATE users SET account_balance = ?, arrears = ? WHERE id = ?").run(String(total), String(total), userId);
   return getUserById(userId);
@@ -640,7 +699,7 @@ export function addArrear(userId, { description, balance, due_date }) {
 }
 
 export function listArrearsForUser(userId) {
-  return db.prepare("SELECT * FROM arrears WHERE user_id = ? ORDER BY id ASC").all(userId);
+  return buildCurrentArrearsRows(getUserById(userId));
 }
 
 export function addTransaction(userId, { amount, date_created, type, description }) {
@@ -1025,25 +1084,20 @@ export function setAdminSetting(key, value) {
 }
 
 export function getPortfolioOverview() {
-  const totals =
-    db
-      .prepare(`
-        SELECT
-          COUNT(*) AS total_tenants,
-          SUM(CASE WHEN UPPER(COALESCE(status, state, '')) = 'ACTIVE' THEN 1 ELSE 0 END) AS active_tenants,
-          SUM(CASE WHEN CAST(COALESCE(NULLIF(TRIM(arrears), ''), '0') AS REAL) > 0 THEN 1 ELSE 0 END) AS overdue_tenants,
-          SUM(CASE WHEN CAST(COALESCE(NULLIF(TRIM(arrears), ''), '0') AS REAL) <= 0 THEN 1 ELSE 0 END) AS current_tenants
-        FROM users
-      `)
-      .get() || {};
-
+  const users = listUsers();
+  const activeTenants = users.filter((user) => String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE").length;
+  const overdueTenants = users.filter((user) => calculateUserOutstanding(user) > 0).length;
+  const currentActiveTenants = users.filter((user) => {
+    const isActive = String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE";
+    return isActive && calculateUserOutstanding(user) <= 0;
+  }).length;
   const activeLeases =
     db.prepare("SELECT COUNT(*) AS count FROM leases WHERE UPPER(COALESCE(status, '')) = 'ACTIVE'").get()?.count || 0;
-  const occupiedUnits = Number(totals.active_tenants || 0);
+  const occupiedUnits = Number(activeTenants || 0);
   const totalUnits = Math.max(occupiedUnits + 2, 6);
   const vacancies = Math.max(totalUnits - occupiedUnits, 0);
   const rentCollectionRate = occupiedUnits
-    ? Math.round((Number(totals.current_tenants || 0) / occupiedUnits) * 100)
+    ? Math.round((Number(currentActiveTenants || 0) / occupiedUnits) * 100)
     : 100;
 
   return {
@@ -1051,7 +1105,7 @@ export function getPortfolioOverview() {
     occupied_units: occupiedUnits,
     vacant_units: vacancies,
     active_leases: activeLeases,
-    overdue_tenants: Number(totals.overdue_tenants || 0),
+    overdue_tenants: Number(overdueTenants || 0),
     rent_collection_rate: rentCollectionRate,
   };
 }

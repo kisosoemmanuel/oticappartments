@@ -1,6 +1,6 @@
 const app = document.getElementById("app");
 const AUTO_REFRESH_INTERVAL_MS = 10000;
-const TENANT_AUTO_REFRESH_ENABLED = false;
+const TENANT_AUTO_REFRESH_ENABLED = true;
 let tenantAutoRefreshTimer = null;
 let tenantAutoRefreshInFlight = false;
 let tenantDashboardLoadRequestId = 0;

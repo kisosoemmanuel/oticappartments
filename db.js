@@ -23,6 +23,7 @@ export const releaseUnitByTenantId = (...args) => driver.releaseUnitByTenantId(.
 export const updateUnitStatus = (...args) => driver.updateUnitStatus(...args);
 export const recalculateUserFinancials = (...args) => driver.recalculateUserFinancials(...args);
 export const applyGlobalBilling = (...args) => driver.applyGlobalBilling(...args);
+export const updateUserBilling = (...args) => driver.updateUserBilling(...args);
 export const adjustUserBalance = (...args) => driver.adjustUserBalance(...args);
 export const deleteUserById = (...args) => driver.deleteUserById(...args);
 export const addArrear = (...args) => driver.addArrear(...args);

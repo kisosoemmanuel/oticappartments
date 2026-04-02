@@ -666,6 +666,39 @@ export function applyGlobalBilling({ rent = 0, water = 0, trash = 0, electricity
   return listUsers();
 }
 
+export function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, electricity = 0 }) {
+  const user = getUserById(userId);
+  if (!user) return null;
+
+  const total = Number(rent) + Number(water) + Number(trash) + Number(electricity);
+  db.prepare(
+    `
+      UPDATE users
+      SET rent = ?,
+          bill = ?,
+          rent_balance = ?,
+          water_balance = ?,
+          trash_balance = ?,
+          electricity_balance = ?,
+          account_balance = ?,
+          arrears = ?
+      WHERE id = ?
+    `
+  ).run(
+    String(rent),
+    String(water),
+    String(rent),
+    String(water),
+    String(trash),
+    String(electricity),
+    String(total),
+    String(total),
+    userId
+  );
+
+  return getUserById(userId);
+}
+
 export function adjustUserBalance(userId, paymentFor, amount) {
   const user = getUserById(userId);
   if (!user) return null;

@@ -113,6 +113,7 @@ Current variables:
 - `NODE_ENV`
 - `PORT`
 - `APP_BASE_URL`
+- `APP_TIME_ZONE`
 - `DATABASE_URL`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
@@ -126,6 +127,7 @@ Important notes:
 
 - In production, the server will refuse to start unless `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `BACKUP_SECRET` are set.
 - `DATABASE_URL` is the main production database setting and is what the Render deployment should use.
+- `APP_TIME_ZONE` controls date-based reminders and billing alerts. It defaults to `Africa/Nairobi`.
 - `SQLITE_DB_PATH` is optional and is only used by the one-time migration script when you want to import an existing SQLite file into Postgres.
 - `DB_PATH` is still available for local SQLite fallback.
 - `BACKUP_DIR` should also be persistent.

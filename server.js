@@ -47,6 +47,7 @@ import {
   touchUserActivity,
   updateMaintenanceTicketStatus,
   updatePaymentRequestStatus,
+  updateUserBilling,
   updateUserToken,
   updateUserProfile,
   updateVacateNoticeStatus,
@@ -78,6 +79,21 @@ const MPESA_ACCOUNT_NUMBER = "024000000880";
 const TENANT_ONLINE_WINDOW_MS = 2 * 60 * 1000;
 const TENANT_RECENT_WINDOW_MS = 30 * 60 * 1000;
 const TENANT_ACTIVITY_TOUCH_WINDOW_MS = 20 * 1000;
+const PROPERTY_TIME_ZONE = process.env.APP_TIME_ZONE || "Africa/Nairobi";
+const BILLING_DUE_DAY = 7;
+const OVERDUE_ALERT_DELAY_DAYS = 5;
+const propertyDatePartsFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: PROPERTY_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const propertyDateLabelFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: PROPERTY_TIME_ZONE,
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 const adminSessions = new Map();
 const adminCookieOptions = {
   httpOnly: true,
@@ -186,6 +202,56 @@ function parseTimestamp(value) {
   return Number.isNaN(time) ? null : time;
 }
 
+function getDatePartsInPropertyTimeZone(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = {};
+  for (const part of propertyDatePartsFormatter.formatToParts(date)) {
+    if (part.type !== "literal") {
+      parts[part.type] = part.value;
+    }
+  }
+
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+  };
+}
+
+function buildDateKey({ year, month, day }) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function formatPropertyDateLabel(parts) {
+  return propertyDateLabelFormatter.format(new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0)));
+}
+
+function hasPaymentActivitySince(dateKey, payments = [], transactions = []) {
+  const seenSinceDate = (value) => {
+    const parts = getDatePartsInPropertyTimeZone(value);
+    return parts ? buildDateKey(parts) >= dateKey : false;
+  };
+
+  const paymentRecorded = payments.some((payment) => {
+    const normalizedStatus = String(payment?.status || "").trim().toUpperCase();
+    if (normalizedStatus === "DISAPPROVED") {
+      return false;
+    }
+
+    return seenSinceDate(payment?.created_at);
+  });
+
+  if (paymentRecorded) {
+    return true;
+  }
+
+  return transactions.some((transaction) => seenSinceDate(transaction?.date_created || transaction?.created_at));
+}
+
 function buildTenantActivityMeta(user) {
   const lastSeenAt = user?.last_seen_at || null;
   const lastLoginAt = user?.last_login_at || null;
@@ -228,24 +294,59 @@ function sanitizeTenantMaintenanceTicket(ticket) {
 
 async function buildAutomatedAlerts(user) {
   const generated = [];
-  const arrearsAmount = Number(user.arrears || 0);
-  if (arrearsAmount > 0) {
-    generated.push({
-      id: `auto-overdue-${user.id}`,
-      type: "overdue",
-      title: "Overdue balance alert",
-      message: `Your account has an overdue balance of KES ${arrearsAmount.toLocaleString()}.`,
-      severity: "critical",
-      status: "ACTIVE",
-      trigger_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      source: "system",
-    });
+  const now = new Date();
+  const bills = await getTenantBillBreakdown(user);
+  const outstanding = Number(bills.total || 0);
+  const todayParts = getDatePartsInPropertyTimeZone(now);
+
+  if (outstanding > 0 && todayParts) {
+    const todayKey = buildDateKey(todayParts);
+    const dueDateParts = { ...todayParts, day: BILLING_DUE_DAY };
+    const overdueDateParts = { ...todayParts, day: BILLING_DUE_DAY + OVERDUE_ALERT_DELAY_DAYS };
+    const dueDateKey = buildDateKey(dueDateParts);
+    const overdueDateKey = buildDateKey(overdueDateParts);
+
+    if (todayParts.day <= BILLING_DUE_DAY) {
+      generated.push({
+        id: `auto-rent-due-${user.id}-${dueDateKey}`,
+        type: "rent_reminder",
+        title: "Rent due reminder",
+        message: `Please clear your outstanding rent and bills of KES ${outstanding.toLocaleString()} by ${formatPropertyDateLabel(
+          dueDateParts
+        )}.`,
+        severity: "info",
+        status: "ACTIVE",
+        trigger_date: dueDateKey,
+        created_at: now.toISOString(),
+        source: "system",
+      });
+    } else if (todayKey >= overdueDateKey) {
+      const [payments, transactions] = await Promise.all([
+        listPaymentRequestsForUser(user.id),
+        listTransactionsForUser(user.id),
+      ]);
+      const paymentRecordedSinceDueDate = hasPaymentActivitySince(dueDateKey, payments, transactions);
+
+      if (!paymentRecordedSinceDueDate) {
+        generated.push({
+          id: `auto-overdue-${user.id}-${overdueDateKey}`,
+          type: "overdue",
+          title: "Late payment alert",
+          message: `Your balance of KES ${outstanding.toLocaleString()} is still unpaid 5 days after the ${formatPropertyDateLabel(
+            dueDateParts
+          )} due date.`,
+          severity: "critical",
+          status: "ACTIVE",
+          trigger_date: overdueDateKey,
+          created_at: now.toISOString(),
+          source: "system",
+        });
+      }
+    }
   }
 
   const activeLease = await getActiveLeaseForUser(user.id);
   if (activeLease?.end_date) {
-    const now = new Date();
     const leaseEnd = new Date(activeLease.end_date);
     const daysRemaining = Math.ceil((leaseEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     if (daysRemaining > 0 && daysRemaining <= 90) {
@@ -262,18 +363,6 @@ async function buildAutomatedAlerts(user) {
       });
     }
   }
-
-  generated.push({
-    id: `auto-rent-${user.id}`,
-    type: "rent_reminder",
-    title: "Upcoming rent reminder",
-    message: "Rent reminders are active for the 5th of every month.",
-    severity: "info",
-    status: "ACTIVE",
-    trigger_date: null,
-    created_at: new Date().toISOString(),
-    source: "system",
-  });
 
   return generated;
 }
@@ -1113,6 +1202,43 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandle
     payments,
     transactions,
     arrears,
+  });
+}));
+
+app.post("/api/admin/tenants/:tenantId/billing", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserByTenantId(req.params.tenantId);
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  let rent;
+  let water;
+  let trash;
+  let electricity;
+
+  try {
+    rent = parseNonNegativeMoney(req.body?.rent, "rent");
+    water = parseNonNegativeMoney(req.body?.water, "water");
+    trash = parseNonNegativeMoney(req.body?.trash, "trash");
+    electricity = parseNonNegativeMoney(req.body?.electricity, "electricity");
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const updatedTenant = await updateUserBilling(user.id, {
+    rent,
+    water,
+    trash,
+    electricity,
+  });
+  const expectedTotal = await getExpectedCollectionTotal();
+  await setAdminSetting("expected_collection_total", expectedTotal);
+
+  res.json({
+    success: true,
+    tenant: sanitizeUser(updatedTenant),
+    bills: await getTenantBillBreakdown(updatedTenant),
+    expected_collection_total: expectedTotal,
   });
 }));
 

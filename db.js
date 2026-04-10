@@ -7,6 +7,8 @@ export const initDb = (...args) => driver.initDb(...args);
 export const hashPassword = (...args) => driver.hashPassword(...args);
 export const verifyPassword = (...args) => driver.verifyPassword(...args);
 export const generateToken = (...args) => driver.generateToken(...args);
+export const listProperties = (...args) => driver.listProperties(...args);
+export const getPropertyById = (...args) => driver.getPropertyById(...args);
 export const createUser = (...args) => driver.createUser(...args);
 export const getUserByFirstName = (...args) => driver.getUserByFirstName(...args);
 export const listUsersByFirstName = (...args) => driver.listUsersByFirstName(...args);
@@ -43,6 +45,7 @@ export const listStoredAlertsForUser = (...args) => driver.listStoredAlertsForUs
 export const addMaintenanceTicket = (...args) => driver.addMaintenanceTicket(...args);
 export const listMaintenanceForUser = (...args) => driver.listMaintenanceForUser(...args);
 export const listAllMaintenanceTickets = (...args) => driver.listAllMaintenanceTickets(...args);
+export const getMaintenanceTicketById = (...args) => driver.getMaintenanceTicketById(...args);
 export const updateMaintenanceTicketStatus = (...args) => driver.updateMaintenanceTicketStatus(...args);
 export const addDocument = (...args) => driver.addDocument(...args);
 export const addSharedDocument = (...args) => driver.addSharedDocument(...args);

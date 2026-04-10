@@ -71,6 +71,52 @@ export function initDb() {
   ensureColumn("users", "electricity_balance", "TEXT");
   ensureColumn("users", "last_seen_at", "TEXT");
   ensureColumn("users", "last_login_at", "TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_users_property_id ON users(property_id);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS properties (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
+  const upsertProperty = db.prepare(`
+    INSERT INTO properties (id, name)
+    VALUES (?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name = COALESCE(NULLIF(excluded.name, ''), properties.name)
+  `);
+  upsertProperty.run("otic-1", "Otic 1");
+  upsertProperty.run("otic-2", "Otic 2");
+
+  const legacyProperties = db.prepare(`
+    SELECT DISTINCT
+      TRIM(property_id) AS id,
+      COALESCE(NULLIF(TRIM(property_name), ''), TRIM(property_id)) AS name
+    FROM users
+    WHERE COALESCE(NULLIF(TRIM(property_id), ''), '') <> ''
+  `).all();
+  for (const property of legacyProperties) {
+    upsertProperty.run(property.id, property.name || property.id);
+  }
+
+  db.prepare(`
+    UPDATE users
+    SET property_id = 'otic-1'
+    WHERE COALESCE(NULLIF(TRIM(property_id), ''), '') = ''
+  `).run();
+
+  db.prepare(`
+    UPDATE users
+    SET property_name = COALESCE(
+      (SELECT name FROM properties WHERE properties.id = users.property_id LIMIT 1),
+      NULLIF(TRIM(property_name), ''),
+      'Otic 1'
+    )
+  `).run();
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS arrears (
@@ -189,6 +235,7 @@ export function initDb() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS shared_documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      property_id TEXT,
       name TEXT NOT NULL,
       category TEXT,
       status TEXT DEFAULT 'AVAILABLE',
@@ -198,6 +245,15 @@ export function initDb() {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+  ensureColumn("shared_documents", "property_id", "TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_shared_documents_property_id ON shared_documents(property_id);
+  `);
+  db.prepare(`
+    UPDATE shared_documents
+    SET property_id = 'otic-1'
+    WHERE COALESCE(NULLIF(TRIM(property_id), ''), '') = ''
+  `).run();
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS tenant_uploads (
@@ -298,6 +354,26 @@ export function verifyPassword(password, hash) {
 
 export function generateToken() {
   return crypto.randomBytes(24).toString("hex");
+}
+
+export function listProperties() {
+  return db
+    .prepare(`
+      SELECT *
+      FROM properties
+      ORDER BY
+        CASE id
+          WHEN 'otic-1' THEN 0
+          WHEN 'otic-2' THEN 1
+          ELSE 2
+        END,
+        LOWER(name) ASC
+    `)
+    .all();
+}
+
+export function getPropertyById(propertyId) {
+  return db.prepare("SELECT * FROM properties WHERE id = ? LIMIT 1").get(propertyId) || null;
 }
 
 const FINANCIAL_BALANCE_FIELDS = ["rent_balance", "water_balance", "trash_balance", "electricity_balance"];
@@ -537,8 +613,12 @@ export function updateUserProfile(
   return getUserById(userId);
 }
 
-export function listUsers() {
-  return db.prepare("SELECT * FROM users ORDER BY id ASC").all().map((user) => withDerivedFinancials(user));
+export function listUsers({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const rows = normalizedPropertyId
+    ? db.prepare("SELECT * FROM users WHERE property_id = ? ORDER BY id ASC").all(normalizedPropertyId)
+    : db.prepare("SELECT * FROM users ORDER BY id ASC").all();
+  return rows.map((user) => withDerivedFinancials(user));
 }
 
 export function createOrUpdateUnit({ unit_code, floor_number = null, status = "VACANT", tenant_id = null, notes = "" }) {
@@ -786,8 +866,21 @@ export function getPaymentRequestById(id) {
   return db.prepare("SELECT * FROM payment_requests WHERE id = ? LIMIT 1").get(id) || null;
 }
 
-export function listAllPaymentRequests() {
-  return db.prepare("SELECT * FROM payment_requests ORDER BY datetime(created_at) DESC, id DESC").all();
+export function listAllPaymentRequests({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  if (!normalizedPropertyId) {
+    return db.prepare("SELECT * FROM payment_requests ORDER BY datetime(created_at) DESC, id DESC").all();
+  }
+
+  return db
+    .prepare(`
+      SELECT payment_requests.*
+      FROM payment_requests
+      INNER JOIN users ON users.id = payment_requests.user_id
+      WHERE users.property_id = ?
+      ORDER BY datetime(payment_requests.created_at) DESC, payment_requests.id DESC
+    `)
+    .all(normalizedPropertyId);
 }
 
 export function updatePaymentRequestStatus(id, status, review_note = "") {
@@ -836,10 +929,27 @@ export function listMaintenanceForUser(userId) {
     .all(userId);
 }
 
-export function listAllMaintenanceTickets() {
+export function listAllMaintenanceTickets({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  if (!normalizedPropertyId) {
+    return db
+      .prepare("SELECT * FROM maintenance_tickets ORDER BY datetime(updated_at) DESC, id DESC")
+      .all();
+  }
+
   return db
-    .prepare("SELECT * FROM maintenance_tickets ORDER BY datetime(updated_at) DESC, id DESC")
-    .all();
+    .prepare(`
+      SELECT maintenance_tickets.*
+      FROM maintenance_tickets
+      INNER JOIN users ON users.id = maintenance_tickets.user_id
+      WHERE users.property_id = ?
+      ORDER BY datetime(maintenance_tickets.updated_at) DESC, maintenance_tickets.id DESC
+    `)
+    .all(normalizedPropertyId);
+}
+
+export function getMaintenanceTicketById(id) {
+  return db.prepare("SELECT * FROM maintenance_tickets WHERE id = ? LIMIT 1").get(id) || null;
 }
 
 export function updateMaintenanceTicketStatus(id, status, technician_name = null, repair_cost = null) {
@@ -864,6 +974,7 @@ export function addDocument(userId, { name, category, status = "AVAILABLE", url 
 }
 
 export function addSharedDocument({
+  property_id = null,
   name,
   category = "General",
   status = "AVAILABLE",
@@ -873,18 +984,33 @@ export function addSharedDocument({
 }) {
   return db
     .prepare(
-      "INSERT INTO shared_documents (name, category, status, url, original_name, stored_path) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO shared_documents (property_id, name, category, status, url, original_name, stored_path) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
-    .run(name, category, status, url, original_name, stored_path);
+    .run(property_id, name, category, status, url, original_name, stored_path);
 }
 
-export function listSharedDocuments() {
+export function listSharedDocuments({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const args = [];
+  let where = "";
+  if (normalizedPropertyId) {
+    where = "WHERE property_id = ?";
+    args.push(normalizedPropertyId);
+  }
+
   return db
-    .prepare("SELECT *, 'shared' AS scope FROM shared_documents ORDER BY datetime(created_at) DESC, id DESC")
-    .all();
+    .prepare(`SELECT *, 'shared' AS scope FROM shared_documents ${where} ORDER BY datetime(created_at) DESC, id DESC`)
+    .all(...args);
 }
 
-export function listDocumentsForUser(userId) {
+export function listDocumentsForUser(userId, { propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const args = [userId];
+  const sharedWhere = normalizedPropertyId ? "WHERE property_id = ?" : "";
+  if (normalizedPropertyId) {
+    args.push(normalizedPropertyId);
+  }
+
   return db
     .prepare(
       `
@@ -914,11 +1040,12 @@ export function listDocumentsForUser(userId) {
             created_at,
             'shared' AS scope
           FROM shared_documents
+          ${sharedWhere}
         )
         ORDER BY created_at DESC, id DESC
       `
     )
-    .all(userId);
+    .all(...args);
 }
 
 export function addTenantUpload(userId, { name, category = "General", note = "", original_name = "", stored_path = "" }) {
@@ -948,24 +1075,18 @@ export function listMessagesForUser(userId) {
   return db.prepare("SELECT * FROM messages WHERE user_id = ? ORDER BY datetime(created_at) DESC, id DESC").all(userId);
 }
 
-export function listAllMessages({ sender_type = null } = {}) {
+export function listAllMessages({ sender_type = null, propertyId = null } = {}) {
+  const args = [];
+  const where = [];
   if (sender_type) {
-    return db
-      .prepare(`
-        SELECT
-          messages.*,
-          users.tenant_id,
-          users.first_name,
-          users.last_name,
-          users.house_number,
-          users.floor_number,
-          users.property_name
-        FROM messages
-        INNER JOIN users ON users.id = messages.user_id
-        WHERE messages.sender_type = ?
-        ORDER BY datetime(messages.created_at) DESC, messages.id DESC
-      `)
-      .all(sender_type);
+    where.push("messages.sender_type = ?");
+    args.push(sender_type);
+  }
+
+  const normalizedPropertyId = String(propertyId || "").trim();
+  if (normalizedPropertyId) {
+    where.push("users.property_id = ?");
+    args.push(normalizedPropertyId);
   }
 
   return db
@@ -980,9 +1101,10 @@ export function listAllMessages({ sender_type = null } = {}) {
         users.property_name
       FROM messages
       INNER JOIN users ON users.id = messages.user_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY datetime(messages.created_at) DESC, messages.id DESC
     `)
-    .all();
+    .all(...args);
 }
 
 export function addVacateNotice(
@@ -1002,10 +1124,23 @@ export function listVacateNoticesForUser(userId) {
     .all(userId);
 }
 
-export function listAllVacateNotices() {
+export function listAllVacateNotices({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  if (!normalizedPropertyId) {
+    return db
+      .prepare("SELECT * FROM vacate_notices ORDER BY datetime(created_at) DESC, id DESC")
+      .all();
+  }
+
   return db
-    .prepare("SELECT * FROM vacate_notices ORDER BY datetime(created_at) DESC, id DESC")
-    .all();
+    .prepare(`
+      SELECT vacate_notices.*
+      FROM vacate_notices
+      INNER JOIN users ON users.id = vacate_notices.user_id
+      WHERE users.property_id = ?
+      ORDER BY datetime(vacate_notices.created_at) DESC, vacate_notices.id DESC
+    `)
+    .all(normalizedPropertyId);
 }
 
 export function getVacateNoticeById(id) {
@@ -1116,16 +1251,26 @@ export function setAdminSetting(key, value) {
   return getAdminSetting(key, "");
 }
 
-export function getPortfolioOverview() {
-  const users = listUsers();
+export function getPortfolioOverview({ propertyId = null } = {}) {
+  const users = listUsers({ propertyId });
   const activeTenants = users.filter((user) => String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE").length;
   const overdueTenants = users.filter((user) => calculateUserOutstanding(user) > 0).length;
   const currentActiveTenants = users.filter((user) => {
     const isActive = String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE";
     return isActive && calculateUserOutstanding(user) <= 0;
   }).length;
-  const activeLeases =
-    db.prepare("SELECT COUNT(*) AS count FROM leases WHERE UPPER(COALESCE(status, '')) = 'ACTIVE'").get()?.count || 0;
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const activeLeases = normalizedPropertyId
+    ? db
+        .prepare(`
+          SELECT COUNT(*) AS count
+          FROM leases
+          INNER JOIN users ON users.id = leases.user_id
+          WHERE UPPER(COALESCE(leases.status, '')) = 'ACTIVE'
+            AND users.property_id = ?
+        `)
+        .get(normalizedPropertyId)?.count || 0
+    : db.prepare("SELECT COUNT(*) AS count FROM leases WHERE UPPER(COALESCE(status, '')) = 'ACTIVE'").get()?.count || 0;
   const occupiedUnits = Number(activeTenants || 0);
   const totalUnits = Math.max(occupiedUnits + 2, 6);
   const vacancies = Math.max(totalUnits - occupiedUnits, 0);

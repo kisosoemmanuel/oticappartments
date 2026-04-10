@@ -88,6 +88,14 @@ async function ensureColumn(tableName, columnName, columnDefinition) {
 
 export async function initDb() {
   await query(`
+    CREATE TABLE IF NOT EXISTS properties (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
       first_name TEXT NOT NULL,
@@ -132,6 +140,47 @@ export async function initDb() {
   await ensureColumn("users", "electricity_balance", "TEXT");
   await ensureColumn("users", "last_seen_at", "TEXT");
   await ensureColumn("users", "last_login_at", "TEXT");
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_users_property_id ON users(property_id)
+  `);
+  await query(`
+    INSERT INTO properties (id, name)
+    VALUES ('otic-1', 'Otic 1'), ('otic-2', 'Otic 2')
+    ON CONFLICT (id) DO NOTHING
+  `);
+
+  const legacyProperties = await query(`
+    SELECT DISTINCT
+      BTRIM(property_id) AS id,
+      COALESCE(NULLIF(BTRIM(property_name), ''), BTRIM(property_id)) AS name
+    FROM users
+    WHERE NULLIF(BTRIM(property_id), '') IS NOT NULL
+  `);
+  for (const property of legacyProperties.rows) {
+    await query(
+      `
+        INSERT INTO properties (id, name)
+        VALUES ($1, $2)
+        ON CONFLICT (id) DO UPDATE SET
+          name = COALESCE(NULLIF(EXCLUDED.name, ''), properties.name)
+      `,
+      [property.id, property.name || property.id]
+    );
+  }
+
+  await query(`
+    UPDATE users
+    SET property_id = 'otic-1'
+    WHERE NULLIF(BTRIM(property_id), '') IS NULL
+  `);
+  await query(`
+    UPDATE users
+    SET property_name = COALESCE(
+      (SELECT name FROM properties WHERE properties.id = users.property_id LIMIT 1),
+      NULLIF(BTRIM(property_name), ''),
+      'Otic 1'
+    )
+  `);
 
   await query(`
     CREATE TABLE IF NOT EXISTS arrears (
@@ -243,6 +292,7 @@ export async function initDb() {
   await query(`
     CREATE TABLE IF NOT EXISTS shared_documents (
       id BIGSERIAL PRIMARY KEY,
+      property_id TEXT,
       name TEXT NOT NULL,
       category TEXT,
       status TEXT DEFAULT 'AVAILABLE',
@@ -251,6 +301,15 @@ export async function initDb() {
       stored_path TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `);
+  await ensureColumn("shared_documents", "property_id", "TEXT");
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_shared_documents_property_id ON shared_documents(property_id)
+  `);
+  await query(`
+    UPDATE shared_documents
+    SET property_id = 'otic-1'
+    WHERE NULLIF(BTRIM(property_id), '') IS NULL
   `);
 
   await query(`
@@ -348,6 +407,25 @@ export function verifyPassword(password, hash) {
 
 export function generateToken() {
   return crypto.randomBytes(24).toString("hex");
+}
+
+export async function listProperties() {
+  const result = await query(`
+    SELECT *
+    FROM properties
+    ORDER BY
+      CASE id
+        WHEN 'otic-1' THEN 0
+        WHEN 'otic-2' THEN 1
+        ELSE 2
+      END,
+      LOWER(name) ASC
+  `);
+  return result.rows;
+}
+
+export async function getPropertyById(propertyId) {
+  return getOne("SELECT * FROM properties WHERE id = $1 LIMIT 1", [propertyId]);
 }
 
 const FINANCIAL_BALANCE_FIELDS = ["rent_balance", "water_balance", "trash_balance", "electricity_balance"];
@@ -537,8 +615,11 @@ export async function updateUserProfile(
   return getUserById(userId);
 }
 
-export async function listUsers() {
-  const result = await query("SELECT * FROM users ORDER BY id ASC");
+export async function listUsers({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const result = normalizedPropertyId
+    ? await query("SELECT * FROM users WHERE property_id = $1 ORDER BY id ASC", [normalizedPropertyId])
+    : await query("SELECT * FROM users ORDER BY id ASC");
   return result.rows.map((user) => withDerivedFinancials(user));
 }
 
@@ -800,8 +881,20 @@ export async function getPaymentRequestById(id) {
   return getOne("SELECT * FROM payment_requests WHERE id = $1 LIMIT 1", [id]);
 }
 
-export async function listAllPaymentRequests() {
-  const result = await query("SELECT * FROM payment_requests ORDER BY created_at DESC, id DESC");
+export async function listAllPaymentRequests({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const result = normalizedPropertyId
+    ? await query(
+        `
+          SELECT payment_requests.*
+          FROM payment_requests
+          INNER JOIN users ON users.id = payment_requests.user_id
+          WHERE users.property_id = $1
+          ORDER BY payment_requests.created_at DESC, payment_requests.id DESC
+        `,
+        [normalizedPropertyId]
+      )
+    : await query("SELECT * FROM payment_requests ORDER BY created_at DESC, id DESC");
   return result.rows;
 }
 
@@ -853,9 +946,25 @@ export async function listMaintenanceForUser(userId) {
   return result.rows;
 }
 
-export async function listAllMaintenanceTickets() {
-  const result = await query("SELECT * FROM maintenance_tickets ORDER BY updated_at DESC, id DESC");
+export async function listAllMaintenanceTickets({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const result = normalizedPropertyId
+    ? await query(
+        `
+          SELECT maintenance_tickets.*
+          FROM maintenance_tickets
+          INNER JOIN users ON users.id = maintenance_tickets.user_id
+          WHERE users.property_id = $1
+          ORDER BY maintenance_tickets.updated_at DESC, maintenance_tickets.id DESC
+        `,
+        [normalizedPropertyId]
+      )
+    : await query("SELECT * FROM maintenance_tickets ORDER BY updated_at DESC, id DESC");
   return result.rows;
+}
+
+export async function getMaintenanceTicketById(id) {
+  return getOne("SELECT * FROM maintenance_tickets WHERE id = $1 LIMIT 1", [id]);
 }
 
 export async function updateMaintenanceTicketStatus(id, status, technician_name = null, repair_cost = null) {
@@ -885,6 +994,7 @@ export async function addDocument(userId, { name, category, status = "AVAILABLE"
 }
 
 export async function addSharedDocument({
+  property_id = null,
   name,
   category = "General",
   status = "AVAILABLE",
@@ -893,52 +1003,92 @@ export async function addSharedDocument({
   stored_path = "",
 }) {
   return query(
-    "INSERT INTO shared_documents (name, category, status, url, original_name, stored_path) VALUES ($1, $2, $3, $4, $5, $6)",
-    [name, category, status, url, original_name, stored_path]
+    "INSERT INTO shared_documents (property_id, name, category, status, url, original_name, stored_path) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    [property_id, name, category, status, url, original_name, stored_path]
   );
 }
 
-export async function listSharedDocuments() {
-  const result = await query(
-    "SELECT *, 'shared' AS scope FROM shared_documents ORDER BY created_at DESC, id DESC"
-  );
+export async function listSharedDocuments({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const result = normalizedPropertyId
+    ? await query(
+        "SELECT *, 'shared' AS scope FROM shared_documents WHERE property_id = $1 ORDER BY created_at DESC, id DESC",
+        [normalizedPropertyId]
+      )
+    : await query("SELECT *, 'shared' AS scope FROM shared_documents ORDER BY created_at DESC, id DESC");
   return result.rows;
 }
 
-export async function listDocumentsForUser(userId) {
-  const result = await query(
-    `
-      SELECT *
-      FROM (
-        SELECT
-          id,
-          user_id,
-          name,
-          category,
-          status,
-          url,
-          created_at,
-          'tenant' AS scope
-        FROM documents
-        WHERE user_id = $1
+export async function listDocumentsForUser(userId, { propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const result = normalizedPropertyId
+    ? await query(
+        `
+          SELECT *
+          FROM (
+            SELECT
+              id,
+              user_id,
+              name,
+              category,
+              status,
+              url,
+              created_at,
+              'tenant' AS scope
+            FROM documents
+            WHERE user_id = $1
 
-        UNION ALL
+            UNION ALL
 
-        SELECT
-          id,
-          NULL AS user_id,
-          name,
-          category,
-          status,
-          url,
-          created_at,
-          'shared' AS scope
-        FROM shared_documents
-      ) AS combined_documents
-      ORDER BY created_at DESC, id DESC
-    `,
-    [userId]
-  );
+            SELECT
+              id,
+              NULL AS user_id,
+              name,
+              category,
+              status,
+              url,
+              created_at,
+              'shared' AS scope
+            FROM shared_documents
+            WHERE property_id = $2
+          ) AS combined_documents
+          ORDER BY created_at DESC, id DESC
+        `,
+        [userId, normalizedPropertyId]
+      )
+    : await query(
+        `
+          SELECT *
+          FROM (
+            SELECT
+              id,
+              user_id,
+              name,
+              category,
+              status,
+              url,
+              created_at,
+              'tenant' AS scope
+            FROM documents
+            WHERE user_id = $1
+
+            UNION ALL
+
+            SELECT
+              id,
+              NULL AS user_id,
+              name,
+              category,
+              status,
+              url,
+              created_at,
+              'shared' AS scope
+            FROM shared_documents
+          ) AS combined_documents
+          ORDER BY created_at DESC, id DESC
+        `,
+        [userId]
+      );
 
   return result.rows;
 }
@@ -970,42 +1120,37 @@ export async function listMessagesForUser(userId) {
   return result.rows;
 }
 
-export async function listAllMessages({ sender_type = null } = {}) {
+export async function listAllMessages({ sender_type = null, propertyId = null } = {}) {
+  const clauses = [];
+  const params = [];
   if (sender_type) {
-    const result = await query(
-      `
-        SELECT
-          messages.*,
-          users.tenant_id,
-          users.first_name,
-          users.last_name,
-          users.house_number,
-          users.floor_number,
-          users.property_name
-        FROM messages
-        INNER JOIN users ON users.id = messages.user_id
-        WHERE messages.sender_type = $1
-        ORDER BY messages.created_at DESC, messages.id DESC
-      `,
-      [sender_type]
-    );
-    return result.rows;
+    params.push(sender_type);
+    clauses.push(`messages.sender_type = $${params.length}`);
   }
 
-  const result = await query(`
-    SELECT
-      messages.*,
-      users.tenant_id,
-      users.first_name,
-      users.last_name,
-      users.house_number,
-      users.floor_number,
-      users.property_name
-    FROM messages
-    INNER JOIN users ON users.id = messages.user_id
-    ORDER BY messages.created_at DESC, messages.id DESC
-  `);
+  const normalizedPropertyId = String(propertyId || "").trim();
+  if (normalizedPropertyId) {
+    params.push(normalizedPropertyId);
+    clauses.push(`users.property_id = $${params.length}`);
+  }
 
+  const result = await query(
+    `
+      SELECT
+        messages.*,
+        users.tenant_id,
+        users.first_name,
+        users.last_name,
+        users.house_number,
+        users.floor_number,
+        users.property_name
+      FROM messages
+      INNER JOIN users ON users.id = messages.user_id
+      ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
+      ORDER BY messages.created_at DESC, messages.id DESC
+    `,
+    params
+  );
   return result.rows;
 }
 
@@ -1024,8 +1169,20 @@ export async function listVacateNoticesForUser(userId) {
   return result.rows;
 }
 
-export async function listAllVacateNotices() {
-  const result = await query("SELECT * FROM vacate_notices ORDER BY created_at DESC, id DESC");
+export async function listAllVacateNotices({ propertyId = null } = {}) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  const result = normalizedPropertyId
+    ? await query(
+        `
+          SELECT vacate_notices.*
+          FROM vacate_notices
+          INNER JOIN users ON users.id = vacate_notices.user_id
+          WHERE users.property_id = $1
+          ORDER BY vacate_notices.created_at DESC, vacate_notices.id DESC
+        `,
+        [normalizedPropertyId]
+      )
+    : await query("SELECT * FROM vacate_notices ORDER BY created_at DESC, id DESC");
   return result.rows;
 }
 
@@ -1146,16 +1303,30 @@ export async function setAdminSetting(key, value) {
   return getAdminSetting(key, "");
 }
 
-export async function getPortfolioOverview() {
-  const users = await listUsers();
+export async function getPortfolioOverview({ propertyId = null } = {}) {
+  const users = await listUsers({ propertyId });
   const activeTenants = users.filter((user) => String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE").length;
   const overdueTenants = users.filter((user) => calculateUserOutstanding(user) > 0).length;
   const currentActiveTenants = users.filter((user) => {
     const isActive = String(user.status || user.state || "").trim().toUpperCase() === "ACTIVE";
     return isActive && calculateUserOutstanding(user) <= 0;
   }).length;
+  const normalizedPropertyId = String(propertyId || "").trim();
   const activeLeases = Number(
-    (await getOne("SELECT COUNT(*) AS count FROM leases WHERE UPPER(COALESCE(status, '')) = 'ACTIVE'"))?.count || 0
+    normalizedPropertyId
+      ? (
+          await getOne(
+            `
+              SELECT COUNT(*) AS count
+              FROM leases
+              INNER JOIN users ON users.id = leases.user_id
+              WHERE UPPER(COALESCE(leases.status, '')) = 'ACTIVE'
+                AND users.property_id = $1
+            `,
+            [normalizedPropertyId]
+          )
+        )?.count || 0
+      : (await getOne("SELECT COUNT(*) AS count FROM leases WHERE UPPER(COALESCE(status, '')) = 'ACTIVE'"))?.count || 0
   );
   const occupiedUnits = Number(activeTenants || 0);
   const totalUnits = Math.max(occupiedUnits + 2, 6);

@@ -14,6 +14,8 @@ button,input,select,textarea{font:inherit}
 .brand{width:fit-content;padding:14px 18px;border-radius:20px;background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.2)}
 .brand img{width:170px;max-width:100%;display:block}
 #identity{color:rgba(255,255,255,.8);line-height:1.5}
+.topbar-actions{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.topbar-actions .property-control{min-width:220px}
 .nav{display:grid;gap:10px}
 .nav button,.btn{border:0;border-radius:14px;padding:12px 16px;cursor:pointer}
 .nav button{background:transparent;color:rgba(255,255,255,.82);text-align:left}
@@ -97,15 +99,15 @@ textarea{min-height:120px;resize:vertical}
 <button class="btn danger" id="logoutBtn" type="button">Log out</button>
 </aside>
 <main class="main">
-<div class="topbar"><div><div class="pill">Private Admin</div><h1>Admin Console</h1><p class="page-copy">Manage tenants, messages, notices, tickets, payments, and occupancy from one private workspace.</p></div><button class="btn secondary" id="refreshAllBtn" type="button">Refresh</button></div>
+<div class="topbar"><div><div class="pill">Private Admin</div><h1>Admin Console</h1><p id="topbarCopy" class="page-copy">Manage tenants, messages, notices, tickets, payments, and occupancy from one private workspace.</p></div><div class="topbar-actions"><div class="property-control"><label for="propertySelect">Property</label><select id="propertySelect"></select></div><div id="propertyBadge" class="pill">Loading property...</div><button class="btn secondary" id="refreshAllBtn" type="button">Refresh</button></div></div>
 <div id="status" class="status"></div>
 <section id="tab-overview" class="grid">
 <div class="grid stats" id="overviewStats"></div>
 <div class="split"><section class="panel"><h2 class="title">Action Queue</h2><div id="actionQueue" class="list"></div></section><section class="panel"><h2 class="title">Occupancy Control</h2><form id="occupancyForm" class="stack"><div class="filters"><div><label for="occupiedUnitsInput">Occupied Units</label><input id="occupiedUnitsInput" type="number" min="0" step="1" /></div><div><label for="vacantUnitsInput">Vacant Units</label><input id="vacantUnitsInput" type="number" min="0" step="1" /></div></div><button class="btn" type="submit">Save Occupancy</button></form></section></div>
 </section>
-<section id="tab-tenants" class="hidden"><div id="tenantListView" class="three"><section class="panel"><h2 class="title">Tenant Filters</h2><div class="filters"><div><label for="tenantFloorFilter">Floor</label><select id="tenantFloorFilter"></select></div><div><label for="tenantSearch">Search</label><input id="tenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div id="tenantCards" class="list"></div></section><section class="panel"><h2 class="title">Quick Preview</h2><div id="tenantPreview" class="list"><div class="item">Choose a tenant to preview their record.</div></div></section><section class="panel"><h2 class="title">Create Tenant</h2><form id="createUserForm" class="stack"><div class="filters"><div><label for="firstName">First name</label><input id="firstName" required /></div><div><label for="lastName">Last name</label><input id="lastName" /></div><div><label for="accountNumber">Account number</label><input id="accountNumber" required /></div><div><label for="floorNumber">Floor number</label><input id="floorNumber" /></div><div><label for="houseNumber">Unit / house number</label><input id="houseNumber" /></div><div><label for="phoneNumber">Phone</label><input id="phoneNumber" /></div><div><label for="rent">Rent</label><input id="rent" type="number" min="0" step="0.01" /></div><div><label for="waterBill">Water Bill</label><input id="waterBill" type="number" min="0" step="0.01" /></div><div><label for="trashBill">Trash Bill</label><input id="trashBill" type="number" min="0" step="0.01" /></div><div><label for="electricityBill">Electricity Bill</label><input id="electricityBill" type="number" min="0" step="0.01" /></div><div><label for="deposit">Deposit</label><input id="deposit" type="number" min="0" step="0.01" /></div></div><div class="muted">Account balance is calculated automatically from the payable amounts you enter.</div><button class="btn" type="submit">Create user</button></form></section></div></section>
+<section id="tab-tenants" class="hidden"><div id="tenantListView" class="three"><section class="panel"><h2 class="title">Tenant Filters</h2><div class="filters"><div><label for="tenantFloorFilter">Floor</label><select id="tenantFloorFilter"></select></div><div><label for="tenantSearch">Search</label><input id="tenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div id="tenantCards" class="list"></div></section><section class="panel"><h2 class="title">Quick Preview</h2><div id="tenantPreview" class="list"><div class="item">Choose a tenant to preview their record.</div></div></section><section class="panel"><h2 class="title">Create Tenant</h2><form id="createUserForm" class="stack"><div class="filters"><div><label for="firstName">First name</label><input id="firstName" required /></div><div><label for="lastName">Last name</label><input id="lastName" /></div><div><label for="accountNumber">Account number</label><input id="accountNumber" required /></div><div><label for="floorNumber">Floor number</label><input id="floorNumber" /></div><div><label for="houseNumber">Unit / house number</label><input id="houseNumber" /></div><div><label for="phoneNumber">Phone</label><input id="phoneNumber" /></div><div><label for="rent">Rent</label><input id="rent" type="number" min="0" step="0.01" /></div><div><label for="waterBill">Water Bill</label><input id="waterBill" type="number" min="0" step="0.01" /></div><div><label for="trashBill">Trash Bill</label><input id="trashBill" type="number" min="0" step="0.01" /></div><div><label for="electricityBill">Electricity Bill</label><input id="electricityBill" type="number" min="0" step="0.01" /></div><div><label for="deposit">Deposit</label><input id="deposit" type="number" min="0" step="0.01" /></div></div><div id="createTenantPropertyHint" class="muted">New tenants created here will be assigned to the selected property.</div><div class="muted">Account balance is calculated automatically from the payable amounts you enter.</div><button class="btn" type="submit">Create user</button></form></section></div></section>
 <section id="tab-tenant-detail" class="hidden"><div class="toolbar" style="justify-content:space-between;margin-bottom:14px;"><button class="btn secondary" id="backToTenantsBtn" type="button">Back to Tenants</button><span class="pill">Tenant Record</span></div><div id="tenantDetail"></div></section>
-<section id="tab-documents" class="hidden"><div class="split"><section class="panel"><h2 class="title">Upload Shared Document</h2><form id="sharedDocumentForm" class="stack"><div class="filters"><div><label for="sharedDocumentName">Document name</label><input id="sharedDocumentName" placeholder="e.g. House Rules" /></div><div><label for="sharedDocumentCategory">Category</label><input id="sharedDocumentCategory" value="General" /></div></div><div><label for="sharedDocumentStatus">Status</label><select id="sharedDocumentStatus"><option value="AVAILABLE">Available</option><option value="REQUIRED">Required</option><option value="IMPORTANT">Important</option></select></div><div><label for="sharedDocumentFile">File</label><input id="sharedDocumentFile" type="file" /></div><button class="btn" type="submit">Upload For All Tenants</button></form></section><section class="panel"><div class="toolbar" style="justify-content:space-between;"><h2 class="title" style="margin:0;">Published Documents</h2><span class="pill">Visible To Every Tenant</span></div><div id="documentList" class="list" style="margin-top:14px;"></div></section></div></section>
+<section id="tab-documents" class="hidden"><div class="split"><section class="panel"><h2 class="title">Upload Shared Document</h2><form id="sharedDocumentForm" class="stack"><div class="filters"><div><label for="sharedDocumentName">Document name</label><input id="sharedDocumentName" placeholder="e.g. House Rules" /></div><div><label for="sharedDocumentCategory">Category</label><input id="sharedDocumentCategory" value="General" /></div></div><div><label for="sharedDocumentStatus">Status</label><select id="sharedDocumentStatus"><option value="AVAILABLE">Available</option><option value="REQUIRED">Required</option><option value="IMPORTANT">Important</option></select></div><div><label for="sharedDocumentFile">File</label><input id="sharedDocumentFile" type="file" /></div><button class="btn" type="submit">Upload For All Tenants</button></form></section><section class="panel"><div class="toolbar" style="justify-content:space-between;"><h2 class="title" style="margin:0;">Published Documents</h2><span id="documentScopePill" class="pill">Visible To Current Property</span></div><div id="documentList" class="list" style="margin-top:14px;"></div></section></div></section>
 <section id="tab-messages" class="hidden"><div class="split"><section class="panel"><h2 class="title">All Messages</h2><div class="filters"><div><label for="messageSenderFilter">Sender type</label><select id="messageSenderFilter"><option value="">All senders</option><option value="TENANT">Tenant</option><option value="ADMIN">Admin</option><option value="SYSTEM">System</option></select></div><div><label for="messageSearch">Search</label><input id="messageSearch" placeholder="Tenant, subject, category, body" /></div></div><div id="messageList" class="list"></div></section><section class="panel"><h2 class="title">Send Message</h2><form id="sendMessageForm" class="stack"><div><label for="messageTenant">Tenant</label><select id="messageTenant"></select></div><div class="filters"><div><label for="messageSender">Sender name</label><input id="messageSender" value="Davies Muchai" /></div><div><label for="messageCategory">Category</label><input id="messageCategory" value="Billing" /></div></div><div><label for="messageSubject">Subject</label><input id="messageSubject" /></div><div><label for="messageBody">Message body</label><textarea id="messageBody"></textarea></div><button class="btn" type="submit">Send message</button></form><div class="toolbar" style="margin-top:14px;"><button class="btn secondary" id="loadMessagesBtn" type="button">Load conversation</button></div><div id="messageThread" class="list" style="margin-top:14px;"></div></section></div></section>
 <section id="tab-notices" class="hidden"><section class="panel"><h2 class="title">Vacating Notices</h2><div class="filters"><div><label for="noticeSearch">Search</label><input id="noticeSearch" placeholder="Tenant, unit, property" /></div><div><label for="noticeStatusFilter">Status</label><select id="noticeStatusFilter"><option value="">All statuses</option><option value="Pending">Pending</option><option value="APPROVED">Approved</option><option value="DISAPPROVED">Disapproved</option></select></div></div><div id="noticeList" class="list"></div></section></section>
 <section id="tab-tickets" class="hidden"><section class="panel"><h2 class="title">Tickets</h2><div class="filters"><div><label for="ticketSearch">Search</label><input id="ticketSearch" placeholder="Tenant, title, status" /></div><div><label for="ticketStatusFilter">Status</label><select id="ticketStatusFilter"><option value="">All open tickets</option><option value="Pending">Pending</option><option value="In Progress">In Progress</option></select></div></div><div id="ticketList" class="list"></div></section></section>
@@ -114,8 +116,11 @@ textarea{min-height:120px;resize:vertical}
 </div>
 <script>
 const state = {
+  username: "",
   overview: null,
   meta: {},
+  properties: [],
+  selectedProperty: null,
   users: [],
   messages: [],
   notices: [],
@@ -144,6 +149,10 @@ const esc = (value) =>
     .replaceAll("'", "&#39;");
 const money = (value) =>
   `KES ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function currentPropertyName() {
+  return state.selectedProperty?.name || "the selected property";
+}
 
 function setStatus(text, isError) {
   statusEl.textContent = text;
@@ -302,7 +311,73 @@ async function fetchJson(url, options = {}) {
 
 async function ensureSession() {
   const data = await fetchJson("/api/admin/session");
-  identityEl.textContent = `Signed in as ${data.username || "Admin"}`;
+  state.username = data.username || "Admin";
+  state.properties = data.properties || [];
+  state.selectedProperty = data.selected_property || null;
+  renderPropertyContext();
+}
+
+function renderPropertyContext() {
+  const propertySelect = document.getElementById("propertySelect");
+  const propertyBadge = document.getElementById("propertyBadge");
+  const topbarCopy = document.getElementById("topbarCopy");
+  const createTenantPropertyHint = document.getElementById("createTenantPropertyHint");
+  const documentScopePill = document.getElementById("documentScopePill");
+  const currentPropertyId = state.selectedProperty?.id || "";
+
+  propertySelect.innerHTML = (state.properties || []).length
+    ? state.properties
+        .map((property) => `<option value="${esc(property.id)}">${esc(property.name || property.id)}</option>`)
+        .join("")
+    : '<option value="">No properties available</option>';
+  if (currentPropertyId) {
+    propertySelect.value = currentPropertyId;
+  }
+
+  const propertyName = currentPropertyName();
+  identityEl.textContent = state.selectedProperty
+    ? `Signed in as ${state.username || "Admin"} | ${propertyName}`
+    : `Signed in as ${state.username || "Admin"}`;
+  propertyBadge.textContent = state.selectedProperty ? `Viewing ${propertyName}` : "Select a property";
+  topbarCopy.textContent = state.selectedProperty
+    ? `Manage tenants, messages, notices, tickets, payments, and occupancy for ${propertyName} from one private workspace.`
+    : "Manage tenants, messages, notices, tickets, payments, and occupancy from one private workspace.";
+  createTenantPropertyHint.textContent = state.selectedProperty
+    ? `New tenants created here will be assigned to ${propertyName}.`
+    : "New tenants created here will be assigned to the selected property.";
+  documentScopePill.textContent = state.selectedProperty
+    ? `Visible To ${propertyName} Tenants`
+    : "Visible To Current Property";
+}
+
+async function switchProperty(propertyId) {
+  const nextPropertyId = String(propertyId || "").trim();
+  if (!nextPropertyId || nextPropertyId === (state.selectedProperty?.id || "")) {
+    renderPropertyContext();
+    return;
+  }
+
+  const payload = await fetchJson("/api/admin/context/property", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ property_id: nextPropertyId }),
+  });
+
+  if (payload.token) {
+    localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, payload.token);
+  }
+
+  state.properties = payload.properties || state.properties;
+  state.selectedProperty = payload.selected_property || state.selectedProperty;
+  state.billingSelection = [];
+  state.billingSelectionInitialized = false;
+  state.tenantDetail = null;
+  document.getElementById("tenantDetail").innerHTML = "";
+  document.getElementById("messageThread").innerHTML = "";
+  switchTab("overview");
+  renderPropertyContext();
+  await loadAllData({ force: true });
+  setStatus(`Now viewing ${currentPropertyName()}.`, false);
 }
 
 function switchTab(tab) {
@@ -389,7 +464,7 @@ function renderTenantOptions() {
   const select = document.getElementById("messageTenant");
   const current = select.value;
   if (!state.users.length) {
-    select.innerHTML = '<option value="">No tenants available</option>';
+    select.innerHTML = `<option value="">No tenants available in ${esc(currentPropertyName())}</option>`;
     return;
   }
 
@@ -423,14 +498,14 @@ function buildTenantListEmptyState() {
   const provider = String(state.meta?.database_provider || "").trim().toLowerCase();
   if (provider === "postgres") {
     return `<div class="item">
-      <strong>No tenants found in the deployed Postgres database.</strong>
+      <strong>No tenants found for ${esc(currentPropertyName())} in the deployed Postgres database.</strong>
       <div class="muted">If your records were created locally in SQLite, they do not sync automatically. Run <code>npm run migrate:sqlite-to-postgres</code> against the same Render Postgres database, then refresh this page.</div>
     </div>`;
   }
 
   return `<div class="item">
-    <strong>No tenants yet.</strong>
-    <div class="muted">Create the first tenant from the form on this page to populate the admin dashboard.</div>
+    <strong>No tenants yet for ${esc(currentPropertyName())}.</strong>
+    <div class="muted">Create the first tenant from the form on this page to populate this property dashboard.</div>
   </div>`;
 }
 
@@ -751,7 +826,7 @@ function renderDocuments() {
           ${actions}
         </article>`;
       })
-      .join("") || '<div class="item">No shared documents have been published yet.</div>';
+      .join("") || `<div class="item">No shared documents have been published yet for ${esc(currentPropertyName())}.</div>`;
 }
 
 function renderNotices() {
@@ -967,7 +1042,9 @@ async function loadAllData({ force = false } = {}) {
       return;
     }
 
-    identityEl.textContent = `Signed in as ${payload.username || "Admin"}`;
+    state.username = payload.username || "Admin";
+    state.properties = payload.properties || [];
+    state.selectedProperty = payload.selected_property || null;
     state.overview = payload.overview || null;
     state.meta = payload.meta || {};
     state.users = payload.users?.users || [];
@@ -977,6 +1054,7 @@ async function loadAllData({ force = false } = {}) {
     state.tickets = payload.tickets?.tickets || [];
     state.payments = payload.payments || { summary: {}, billing: {}, payments: [] };
 
+    renderPropertyContext();
     syncBillingSelection();
     fillFloorSelect();
     renderOverview();
@@ -1084,7 +1162,7 @@ async function createUser(event) {
   });
   document.getElementById("createUserForm").reset();
   await loadAllData({ force: true });
-  setStatus("User created successfully.", false);
+  setStatus(`Tenant created in ${currentPropertyName()}.`, false);
 }
 
 async function saveTenantBilling(event) {
@@ -1162,7 +1240,7 @@ async function uploadSharedDocument(event) {
   document.getElementById("sharedDocumentCategory").value = "General";
   document.getElementById("sharedDocumentStatus").value = "AVAILABLE";
   await loadAllData({ force: true });
-  setStatus("Shared document uploaded for all tenants.", false);
+  setStatus(`Shared document uploaded for ${currentPropertyName()} tenants.`, false);
 }
 
 async function savePaymentTargets(event) {
@@ -1237,6 +1315,9 @@ document.querySelectorAll(".nav button").forEach((button) =>
 document
   .getElementById("refreshAllBtn")
   .addEventListener("click", () => refreshAdminData({ silent: false, force: true }));
+document.getElementById("propertySelect").addEventListener("change", (event) => {
+  switchProperty(event.target.value).catch((error) => setStatus(error.message, true));
+});
 document.getElementById("logoutBtn").addEventListener("click", logout);
 document.getElementById("createUserForm").addEventListener("submit", (event) => createUser(event).catch((error) => setStatus(error.message, true)));
 document.getElementById("sharedDocumentForm").addEventListener("submit", (event) => uploadSharedDocument(event).catch((error) => setStatus(error.message, true)));

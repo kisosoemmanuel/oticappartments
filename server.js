@@ -20,10 +20,13 @@ import {
   DATABASE_PROVIDER,
   DATABASE_PATH,
   deleteUserById,
+  getMaintenanceTicketById,
   getPaymentRequestById,
   getAdminSetting,
   getActiveLeaseForUser,
   getPortfolioOverview,
+  getPropertyById,
+  getUserById,
   getUserByTenantId,
   getVacateNoticeById,
   listArrearsForUser,
@@ -36,6 +39,7 @@ import {
   listMaintenanceForUser,
   listMessagesForUser,
   listPaymentRequestsForUser,
+  listProperties,
   listUsersByFirstName,
   listSharedDocuments,
   listStoredAlertsForUser,
@@ -74,6 +78,7 @@ const BACKUP_DIR = process.env.BACKUP_DIR ? path.resolve(process.env.BACKUP_DIR)
 const UPLOAD_DIR = process.env.UPLOAD_DIR ? path.resolve(process.env.UPLOAD_DIR) : path.join(__dirname, "uploads");
 const DOCUMENT_UPLOAD_DIR = path.join(UPLOAD_DIR, "documents");
 const ADMIN_SESSION_COOKIE = "otic_admin_session";
+const DEFAULT_PROPERTY_ID = "otic-1";
 const MPESA_PAYBILL_NUMBER = "222111";
 const MPESA_ACCOUNT_NUMBER = "024000000880";
 const TENANT_ONLINE_WINDOW_MS = 2 * 60 * 1000;
@@ -382,27 +387,49 @@ function paymentMethodsFor(user) {
   ];
 }
 
-async function getBillingConfig() {
+function getScopedAdminSettingKey(propertyId, key) {
+  const normalizedPropertyId = String(propertyId || "").trim();
+  return normalizedPropertyId ? `property:${normalizedPropertyId}:${key}` : key;
+}
+
+async function getScopedAdminSetting(propertyId, key, fallbackValue = null) {
+  const scopedValue = await getAdminSetting(getScopedAdminSettingKey(propertyId, key), null);
+  if (scopedValue !== null && scopedValue !== undefined) {
+    return scopedValue;
+  }
+
+  if (!propertyId || propertyId === DEFAULT_PROPERTY_ID) {
+    return getAdminSetting(key, fallbackValue);
+  }
+
+  return fallbackValue;
+}
+
+async function setScopedAdminSetting(propertyId, key, value) {
+  return setAdminSetting(getScopedAdminSettingKey(propertyId, key), value);
+}
+
+async function getBillingConfig(propertyId = null) {
   return {
-    rent: Number((await getAdminSetting("billing_rent", "0")) || 0),
-    water: Number((await getAdminSetting("billing_water", "0")) || 0),
-    trash: Number((await getAdminSetting("billing_trash", "0")) || 0),
-    electricity: Number((await getAdminSetting("billing_electricity", "0")) || 0),
+    rent: Number((await getScopedAdminSetting(propertyId, "billing_rent", "0")) || 0),
+    water: Number((await getScopedAdminSetting(propertyId, "billing_water", "0")) || 0),
+    trash: Number((await getScopedAdminSetting(propertyId, "billing_trash", "0")) || 0),
+    electricity: Number((await getScopedAdminSetting(propertyId, "billing_electricity", "0")) || 0),
   };
 }
 
-async function getOccupancyConfig() {
-  const occupied = Number((await getAdminSetting("occupied_units_manual", "")) || NaN);
-  const vacant = Number((await getAdminSetting("vacant_units_manual", "")) || NaN);
+async function getOccupancyConfig(propertyId = null) {
+  const occupied = Number((await getScopedAdminSetting(propertyId, "occupied_units_manual", "")) || NaN);
+  const vacant = Number((await getScopedAdminSetting(propertyId, "vacant_units_manual", "")) || NaN);
   return {
     occupied_units: Number.isFinite(occupied) ? occupied : null,
     vacant_units: Number.isFinite(vacant) ? vacant : null,
   };
 }
 
-async function getPortfolioOverviewWithOverrides() {
-  const base = await getPortfolioOverview();
-  const occupancy = await getOccupancyConfig();
+async function getPortfolioOverviewWithOverrides(propertyId = null) {
+  const base = await getPortfolioOverview({ propertyId });
+  const occupancy = await getOccupancyConfig(propertyId);
   const occupied = occupancy.occupied_units ?? base.occupied_units;
   const vacant = occupancy.vacant_units ?? base.vacant_units;
   return {
@@ -413,15 +440,17 @@ async function getPortfolioOverviewWithOverrides() {
   };
 }
 
-function buildAdminDatabaseMeta() {
+function buildAdminDatabaseMeta(property = null) {
   return {
     database_provider: DATABASE_PROVIDER,
     storage_label: DATABASE_PROVIDER === "postgres" ? "Postgres" : "SQLite",
+    property_id: property?.id || null,
+    property_name: property?.name || null,
   };
 }
 
 async function getTenantBillBreakdown(user) {
-  const config = await getBillingConfig();
+  const config = await getBillingConfig(user?.property_id || DEFAULT_PROPERTY_ID);
   const breakdown = {
     rent: Number(user.rent_balance ?? user.rent ?? config.rent ?? 0),
     water: Number(user.water_balance ?? user.bill ?? config.water ?? 0),
@@ -453,8 +482,8 @@ function parseNonNegativeMoney(value, fieldName) {
   return String(amount);
 }
 
-async function getExpectedCollectionTotal(users = null) {
-  const resolvedUsers = users || (await listUsers());
+async function getExpectedCollectionTotal(users = null, propertyId = null) {
+  const resolvedUsers = users || (await listUsers({ propertyId }));
   let total = 0;
   for (const user of resolvedUsers) {
     total += (await getTenantBillBreakdown(user)).total;
@@ -477,10 +506,11 @@ function signAdminSessionPayload(payload) {
   return crypto.createHmac("sha256", BACKUP_SECRET).update(payload).digest("hex");
 }
 
-function createAdminSession(username) {
+function createAdminSession(username, propertyId = DEFAULT_PROPERTY_ID) {
   const payload = Buffer.from(
     JSON.stringify({
       username,
+      property_id: String(propertyId || DEFAULT_PROPERTY_ID).trim() || DEFAULT_PROPERTY_ID,
       expires_at: Date.now() + 1000 * 60 * 60 * 12,
     })
   ).toString("base64url");
@@ -517,6 +547,7 @@ function getAdminSessionFromToken(token) {
 
     return {
       username: parsed.username,
+      property_id: String(parsed.property_id || "").trim() || null,
       created_at: new Date(Number(parsed.expires_at) - 1000 * 60 * 60 * 12).toISOString(),
       expires_at: new Date(Number(parsed.expires_at)).toISOString(),
     };
@@ -532,6 +563,28 @@ function clearAdminSession(req, res) {
   });
 }
 
+function setAdminSessionToken(res, token) {
+  res.cookie(ADMIN_SESSION_COOKIE, token, {
+    ...adminCookieOptions,
+    maxAge: 1000 * 60 * 60 * 12,
+  });
+}
+
+async function resolveAdminPropertyContext(selectedPropertyId = null) {
+  const properties = await listProperties();
+  if (!properties.length) {
+    throw new Error("No properties are configured.");
+  }
+
+  const normalizedPropertyId = String(selectedPropertyId || "").trim();
+  const selectedProperty =
+    properties.find((property) => property.id === normalizedPropertyId) ||
+    properties.find((property) => property.id === DEFAULT_PROPERTY_ID) ||
+    properties[0];
+
+  return { properties, selectedProperty };
+}
+
 function requireAdminSession(req, res, next) {
   const cookies = parseCookies(req);
   const token =
@@ -545,6 +598,17 @@ function requireAdminSession(req, res, next) {
 
   req.adminSession = session;
   next();
+}
+
+const requireAdminPropertyContext = asyncHandler(async (req, _res, next) => {
+  const { properties, selectedProperty } = await resolveAdminPropertyContext(req.adminSession.property_id);
+  req.adminProperties = properties;
+  req.adminProperty = selectedProperty;
+  next();
+});
+
+function assertUserInAdminProperty(user, req) {
+  return Boolean(user && String(user.property_id || "").trim() === req.adminProperty.id);
 }
 
 function setNoStore(res) {
@@ -644,7 +708,7 @@ app.post("/api/pegasus/visionary/tenant/app/dashboardOverview", asyncHandler(asy
   const payments = await listPaymentRequestsForUser(user.id);
   const bills = await getTenantBillBreakdown(user);
   res.json({
-    portfolio: await getPortfolioOverviewWithOverrides(),
+    portfolio: await getPortfolioOverviewWithOverrides(user.property_id || DEFAULT_PROPERTY_ID),
     tenant: {
       rent_status: bills.total > 0 ? "Outstanding" : "Current",
       active_lease: Boolean(lease),
@@ -856,7 +920,7 @@ app.post("/api/pegasus/visionary/tenant/app/tenant/ID/upload", (req, res) => {
 app.post("/api/pegasus/visionary/tenant/fetch/documents", asyncHandler(async (req, res) => {
   const user = await validateAuth(req, res);
   if (!user) return;
-  res.json({ success: true, documents: await listDocumentsForUser(user.id) });
+  res.json({ success: true, documents: await listDocumentsForUser(user.id, { propertyId: user.property_id || DEFAULT_PROPERTY_ID }) });
 }));
 
 app.post("/api/pegasus/visionary/tickets/api/tickets/get/tenant", asyncHandler(async (req, res) => {
@@ -915,7 +979,7 @@ app.post("/api/pegasus/visionary/tenant/app/vacating/get", asyncHandler(async (r
   res.json({ notices: await listVacateNoticesForUser(user.id) });
 }));
 
-app.post("/api/admin/login", (req, res) => {
+app.post("/api/admin/login", asyncHandler(async (req, res) => {
   const username = String(req.body?.username || "").trim();
   const password = String(req.body?.password || "").trim();
 
@@ -923,25 +987,54 @@ app.post("/api/admin/login", (req, res) => {
     return res.status(401).json({ error: "Invalid admin credentials" });
   }
 
-  const token = createAdminSession(username);
-  res.cookie(ADMIN_SESSION_COOKIE, token, {
-    ...adminCookieOptions,
-    maxAge: 1000 * 60 * 60 * 12,
-  });
-  res.json({ success: true, username, token });
-});
+  const { selectedProperty, properties } = await resolveAdminPropertyContext(DEFAULT_PROPERTY_ID);
+  const token = createAdminSession(username, selectedProperty.id);
+  setAdminSessionToken(res, token);
+  res.json({ success: true, username, token, selected_property: selectedProperty, properties });
+}));
 
 app.post("/api/admin/logout", (req, res) => {
   clearAdminSession(req, res);
   res.json({ success: true });
 });
 
-app.get("/api/admin/session", requireAdminSession, (req, res) => {
-  res.json({ authenticated: true, username: req.adminSession.username });
-});
+app.get("/api/admin/session", requireAdminSession, asyncHandler(async (req, res) => {
+  const { properties, selectedProperty } = await resolveAdminPropertyContext(req.adminSession.property_id);
+  res.json({
+    authenticated: true,
+    username: req.adminSession.username,
+    properties,
+    selected_property: selectedProperty,
+    property_id: selectedProperty.id,
+  });
+}));
+
+app.post("/api/admin/context/property", requireAdminSession, asyncHandler(async (req, res) => {
+  const propertyId = String(req.body?.property_id || "").trim();
+  if (!propertyId) {
+    return res.status(400).json({ error: "property_id is required" });
+  }
+
+  const property = await getPropertyById(propertyId);
+  if (!property) {
+    return res.status(404).json({ error: "Property not found" });
+  }
+
+  const token = createAdminSession(req.adminSession.username, property.id);
+  setAdminSessionToken(res, token);
+  res.json({
+    success: true,
+    token,
+    property_id: property.id,
+    selected_property: property,
+    properties: await listProperties(),
+  });
+}));
+
+app.use("/api/admin", requireAdminSession, requireAdminPropertyContext);
 
 app.get("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) => {
-  res.json({ users: (await listUsers()).map((user) => sanitizeUser(user)) });
+  res.json({ users: (await listUsers({ propertyId: req.adminProperty.id })).map((user) => sanitizeUser(user)) });
 }));
 
 app.post("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) => {
@@ -951,7 +1044,14 @@ app.post("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) 
   }
 
   try {
-    const user = await createUser({ first_name, last_name, account_number, ...rest });
+    const user = await createUser({
+      first_name,
+      last_name,
+      account_number,
+      ...rest,
+      property_id: req.adminProperty.id,
+      property_name: req.adminProperty.name,
+    });
     res.json({ user: sanitizeUser(user) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -960,13 +1060,13 @@ app.post("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) 
 
 app.delete("/api/admin/users/:tenantId", requireAdminSession, asyncHandler(async (req, res) => {
   const user = await getUserByTenantId(req.params.tenantId);
-  if (!user) return res.status(404).json({ error: "User not found" });
+  if (!assertUserInAdminProperty(user, req)) return res.status(404).json({ error: "User not found" });
   await deleteUserById(user.id);
   res.json({ success: true });
 }));
 
-async function buildAdminUsersPayload() {
-  return buildAdminUsersPayloadFromUsers(await listUsers());
+async function buildAdminUsersPayload(propertyId) {
+  return buildAdminUsersPayloadFromUsers(await listUsers({ propertyId }));
 }
 
 function buildAdminUserDirectory(users) {
@@ -977,16 +1077,16 @@ function buildAdminUsersPayloadFromUsers(users) {
   return { users: users.map((user) => sanitizeUser(user)) };
 }
 
-async function buildAdminOverviewPayload(users = null) {
-  const resolvedUsers = users || (await listUsers());
+async function buildAdminOverviewPayload(users = null, propertyId = null) {
+  const resolvedUsers = users || (await listUsers({ propertyId }));
   const floors = [...new Set(resolvedUsers.map((user) => user.floor_number).filter(Boolean))].sort();
   const [tenantMessages, notices, tickets, expectedCollectionRaw, acquiredCollectionRaw, overview] = await Promise.all([
-    listAllMessages({ sender_type: "TENANT" }),
-    listAllVacateNotices(),
-    listAllMaintenanceTickets(),
-    getAdminSetting("expected_collection_total", "0"),
-    getAdminSetting("acquired_collection_total", "0"),
-    getPortfolioOverviewWithOverrides(),
+    listAllMessages({ sender_type: "TENANT", propertyId }),
+    listAllVacateNotices({ propertyId }),
+    listAllMaintenanceTickets({ propertyId }),
+    getScopedAdminSetting(propertyId, "expected_collection_total", "0"),
+    getScopedAdminSetting(propertyId, "acquired_collection_total", "0"),
+    getPortfolioOverviewWithOverrides(propertyId),
   ]);
   const expectedCollection = Number(expectedCollectionRaw || 0);
   const acquiredCollection = Number(acquiredCollectionRaw || 0);
@@ -1010,18 +1110,18 @@ async function buildAdminOverviewPayload(users = null) {
   };
 }
 
-async function buildAdminMessagesPayload(senderType = null) {
-  return { messages: await listAllMessages({ sender_type: senderType }) };
+async function buildAdminMessagesPayload(senderType = null, propertyId = null) {
+  return { messages: await listAllMessages({ sender_type: senderType, propertyId }) };
 }
 
-async function buildAdminDocumentsPayload() {
-  return { documents: await listSharedDocuments() };
+async function buildAdminDocumentsPayload(propertyId = null) {
+  return { documents: await listSharedDocuments({ propertyId }) };
 }
 
-async function buildAdminVacatingNoticesPayload(users = null) {
-  const resolvedUsers = users || (await listUsers());
+async function buildAdminVacatingNoticesPayload(users = null, propertyId = null) {
+  const resolvedUsers = users || (await listUsers({ propertyId }));
   const userDirectory = buildAdminUserDirectory(resolvedUsers);
-  const notices = await listAllVacateNotices();
+  const notices = await listAllVacateNotices({ propertyId });
 
   return {
     notices: notices.map((notice) => {
@@ -1037,14 +1137,14 @@ async function buildAdminVacatingNoticesPayload(users = null) {
   };
 }
 
-async function buildAdminPaymentsPayload(users = null) {
-  const resolvedUsers = users || (await listUsers());
+async function buildAdminPaymentsPayload(users = null, propertyId = null) {
+  const resolvedUsers = users || (await listUsers({ propertyId }));
   const userDirectory = buildAdminUserDirectory(resolvedUsers);
   const [billing, expectedCollectionRaw, acquiredCollectionRaw, payments] = await Promise.all([
-    getBillingConfig(),
-    getAdminSetting("expected_collection_total", "0"),
-    getAdminSetting("acquired_collection_total", "0"),
-    listAllPaymentRequests(),
+    getBillingConfig(propertyId),
+    getScopedAdminSetting(propertyId, "expected_collection_total", "0"),
+    getScopedAdminSetting(propertyId, "acquired_collection_total", "0"),
+    listAllPaymentRequests({ propertyId }),
   ]);
   const expectedCollection = Number(expectedCollectionRaw || 0);
   const acquiredCollection = Number(acquiredCollectionRaw || 0);
@@ -1072,10 +1172,10 @@ async function buildAdminPaymentsPayload(users = null) {
   };
 }
 
-async function buildAdminTicketsPayload(users = null) {
-  const resolvedUsers = users || (await listUsers());
+async function buildAdminTicketsPayload(users = null, propertyId = null) {
+  const resolvedUsers = users || (await listUsers({ propertyId }));
   const userDirectory = buildAdminUserDirectory(resolvedUsers);
-  const tickets = await listAllMaintenanceTickets();
+  const tickets = await listAllMaintenanceTickets({ propertyId });
 
   return {
     tickets: tickets.map((ticket) => {
@@ -1092,10 +1192,10 @@ async function buildAdminTicketsPayload(users = null) {
   };
 }
 
-async function buildAdminBootstrapPayload(username) {
+async function buildAdminBootstrapPayload(username, selectedProperty, properties = []) {
   let users = null;
   try {
-    users = await listUsers();
+    users = await listUsers({ propertyId: selectedProperty.id });
   } catch (error) {
     console.error("Admin bootstrap user prefetch failed:", error);
   }
@@ -1103,7 +1203,7 @@ async function buildAdminBootstrapPayload(username) {
   const sections = [
     {
       key: "overview",
-      build: () => buildAdminOverviewPayload(users),
+      build: () => buildAdminOverviewPayload(users, selectedProperty.id),
       fallback: {
         overview: { total_units: 0, occupied_units: 0, vacant_units: 0, active_leases: 0, overdue_tenants: 0, rent_collection_rate: 0 },
         security: { backup_count: 0, last_backup_at: null },
@@ -1112,18 +1212,20 @@ async function buildAdminBootstrapPayload(username) {
         floors: [],
       },
     },
-    { key: "users", build: () => (users ? buildAdminUsersPayloadFromUsers(users) : buildAdminUsersPayload()), fallback: { users: [] } },
-    { key: "documents", build: () => buildAdminDocumentsPayload(), fallback: { documents: [] } },
-    { key: "messages", build: () => buildAdminMessagesPayload(), fallback: { messages: [] } },
-    { key: "notices", build: () => buildAdminVacatingNoticesPayload(users), fallback: { notices: [] } },
-    { key: "tickets", build: () => buildAdminTicketsPayload(users), fallback: { tickets: [] } },
-    { key: "payments", build: () => buildAdminPaymentsPayload(users), fallback: { summary: {}, billing: {}, payments: [] } },
+    { key: "users", build: () => (users ? buildAdminUsersPayloadFromUsers(users) : buildAdminUsersPayload(selectedProperty.id)), fallback: { users: [] } },
+    { key: "documents", build: () => buildAdminDocumentsPayload(selectedProperty.id), fallback: { documents: [] } },
+    { key: "messages", build: () => buildAdminMessagesPayload(null, selectedProperty.id), fallback: { messages: [] } },
+    { key: "notices", build: () => buildAdminVacatingNoticesPayload(users, selectedProperty.id), fallback: { notices: [] } },
+    { key: "tickets", build: () => buildAdminTicketsPayload(users, selectedProperty.id), fallback: { tickets: [] } },
+    { key: "payments", build: () => buildAdminPaymentsPayload(users, selectedProperty.id), fallback: { summary: {}, billing: {}, payments: [] } },
   ];
 
   const response = {
     authenticated: true,
     username,
-    meta: buildAdminDatabaseMeta(),
+    properties,
+    selected_property: selectedProperty,
+    meta: buildAdminDatabaseMeta(selectedProperty),
     failures: [],
   };
 
@@ -1143,11 +1245,11 @@ async function buildAdminBootstrapPayload(username) {
 }
 
 app.get("/api/admin/bootstrap", requireAdminSession, asyncHandler(async (req, res) => {
-  res.json(await buildAdminBootstrapPayload(req.adminSession.username));
+  res.json(await buildAdminBootstrapPayload(req.adminSession.username, req.adminProperty, req.adminProperties));
 }));
 
 app.get("/api/admin/overview", requireAdminSession, asyncHandler(async (req, res) => {
-  res.json(await buildAdminOverviewPayload());
+  res.json(await buildAdminOverviewPayload(null, req.adminProperty.id));
 }));
 
 app.post("/api/admin/occupancy", requireAdminSession, asyncHandler(async (req, res) => {
@@ -1158,18 +1260,18 @@ app.post("/api/admin/occupancy", requireAdminSession, asyncHandler(async (req, r
     return res.status(400).json({ error: "occupied_units and vacant_units must be non-negative numbers" });
   }
 
-  await setAdminSetting("occupied_units_manual", occupied);
-  await setAdminSetting("vacant_units_manual", vacant);
+  await setScopedAdminSetting(req.adminProperty.id, "occupied_units_manual", occupied);
+  await setScopedAdminSetting(req.adminProperty.id, "vacant_units_manual", vacant);
 
   res.json({
     success: true,
-    overview: await getPortfolioOverviewWithOverrides(),
+    overview: await getPortfolioOverviewWithOverrides(req.adminProperty.id),
   });
 }));
 
 app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandler(async (req, res) => {
   const user = await getUserByTenantId(req.params.tenantId);
-  if (!user) {
+  if (!assertUserInAdminProperty(user, req)) {
     return res.status(404).json({ error: "User not found" });
   }
 
@@ -1207,7 +1309,7 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandle
 
 app.post("/api/admin/tenants/:tenantId/billing", requireAdminSession, asyncHandler(async (req, res) => {
   const user = await getUserByTenantId(req.params.tenantId);
-  if (!user) {
+  if (!assertUserInAdminProperty(user, req)) {
     return res.status(404).json({ error: "User not found" });
   }
 
@@ -1231,8 +1333,8 @@ app.post("/api/admin/tenants/:tenantId/billing", requireAdminSession, asyncHandl
     trash,
     electricity,
   });
-  const expectedTotal = await getExpectedCollectionTotal();
-  await setAdminSetting("expected_collection_total", expectedTotal);
+  const expectedTotal = await getExpectedCollectionTotal(null, req.adminProperty.id);
+  await setScopedAdminSetting(req.adminProperty.id, "expected_collection_total", expectedTotal);
 
   res.json({
     success: true,
@@ -1250,7 +1352,7 @@ app.post("/api/admin/messages", requireAdminSession, asyncHandler(async (req, re
   }
 
   const user = await getUserByTenantId(tenantId);
-  if (!user) {
+  if (!assertUserInAdminProperty(user, req)) {
     return res.status(404).json({ error: "User not found" });
   }
 
@@ -1267,7 +1369,7 @@ app.post("/api/admin/messages", requireAdminSession, asyncHandler(async (req, re
 
 app.get("/api/admin/messages/:tenantId", requireAdminSession, asyncHandler(async (req, res) => {
   const user = await getUserByTenantId(req.params.tenantId);
-  if (!user) {
+  if (!assertUserInAdminProperty(user, req)) {
     return res.status(404).json({ error: "User not found" });
   }
   res.json({ messages: await listMessagesForUser(user.id) });
@@ -1275,11 +1377,11 @@ app.get("/api/admin/messages/:tenantId", requireAdminSession, asyncHandler(async
 
 app.get("/api/admin/messages", requireAdminSession, asyncHandler(async (req, res) => {
   const senderType = req.query.sender_type ? String(req.query.sender_type) : null;
-  res.json({ messages: await listAllMessages({ sender_type: senderType }) });
+  res.json(await buildAdminMessagesPayload(senderType, req.adminProperty.id));
 }));
 
-app.get("/api/admin/documents", requireAdminSession, asyncHandler(async (_req, res) => {
-  res.json({ documents: await listSharedDocuments() });
+app.get("/api/admin/documents", requireAdminSession, asyncHandler(async (req, res) => {
+  res.json({ documents: await listSharedDocuments({ propertyId: req.adminProperty.id }) });
 }));
 
 app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) => {
@@ -1312,6 +1414,7 @@ app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) =>
 
   try {
     await addSharedDocument({
+      property_id: req.adminProperty.id,
       name,
       category,
       status,
@@ -1328,32 +1431,23 @@ app.post("/api/admin/documents/shared", requireAdminSession, (req, res, next) =>
 
   res.json({
     success: true,
-    document: (await listSharedDocuments())[0] || null,
-    documents: await listSharedDocuments(),
+    document: (await listSharedDocuments({ propertyId: req.adminProperty.id }))[0] || null,
+    documents: await listSharedDocuments({ propertyId: req.adminProperty.id }),
   });
 }));
 
 app.get("/api/admin/vacating-notices", requireAdminSession, asyncHandler(async (req, res) => {
-  const users = await listUsers();
-  const noticesNested = await Promise.all(
-    users.map(async (tenant) =>
-      (await listVacateNoticesForUser(tenant.id)).map((notice) => ({
-        ...notice,
-        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-        tenant_id: tenant.tenant_id,
-        house_number: tenant.house_number,
-        property_name: tenant.property_name,
-      }))
-    )
-  );
-  const notices = noticesNested.flat();
-
-  res.json({ notices });
+  res.json(await buildAdminVacatingNoticesPayload(null, req.adminProperty.id));
 }));
 
 app.post("/api/admin/vacating-notices/:id/review", requireAdminSession, asyncHandler(async (req, res) => {
   const notice = await getVacateNoticeById(req.params.id);
   if (!notice) {
+    return res.status(404).json({ error: "Vacating notice not found" });
+  }
+
+  const user = await getUserById(notice.user_id);
+  if (!assertUserInAdminProperty(user, req)) {
     return res.status(404).json({ error: "Vacating notice not found" });
   }
 
@@ -1370,34 +1464,7 @@ app.post("/api/admin/vacating-notices/:id/review", requireAdminSession, asyncHan
 }));
 
 app.get("/api/admin/payments", requireAdminSession, asyncHandler(async (req, res) => {
-  const users = await listUsers();
-  const billing = await getBillingConfig();
-  const expectedCollection = Number((await getAdminSetting("expected_collection_total", "0")) || 0);
-  const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0);
-  const paymentNested = await Promise.all(
-    users.map(async (tenant) =>
-      (await listPaymentRequestsForUser(tenant.id)).map((payment) => ({
-        ...payment,
-        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-        tenant_id: tenant.tenant_id,
-        house_number: tenant.house_number,
-        floor_number: tenant.floor_number,
-        property_name: tenant.property_name,
-      }))
-    )
-  );
-  const paymentItems = paymentNested.flat();
-
-  res.json({
-    summary: {
-      expected_collection_total: expectedCollection,
-      acquired_collection_total: acquiredCollection,
-      variance: acquiredCollection - expectedCollection,
-      payment_count: paymentItems.length,
-    },
-    billing,
-    payments: paymentItems,
-  });
+  res.json(await buildAdminPaymentsPayload(null, req.adminProperty.id));
 }));
 
 app.post("/api/admin/payments/targets", requireAdminSession, asyncHandler(async (req, res) => {
@@ -1408,8 +1475,8 @@ app.post("/api/admin/payments/targets", requireAdminSession, asyncHandler(async 
     return res.status(400).json({ error: "expected_collection_total and acquired_collection_total must be numbers" });
   }
 
-  await setAdminSetting("expected_collection_total", expected);
-  await setAdminSetting("acquired_collection_total", acquired);
+  await setScopedAdminSetting(req.adminProperty.id, "expected_collection_total", expected);
+  await setScopedAdminSetting(req.adminProperty.id, "acquired_collection_total", acquired);
 
   res.json({
     success: true,
@@ -1439,27 +1506,27 @@ app.post("/api/admin/payments/config", requireAdminSession, asyncHandler(async (
 
   const selectedUsers = (await Promise.all(tenantIds.map((tenantId) => getUserByTenantId(tenantId)))).filter(Boolean);
 
-  if (selectedUsers.length !== tenantIds.length) {
+  if (selectedUsers.length !== tenantIds.length || selectedUsers.some((user) => !assertUserInAdminProperty(user, req))) {
     return res.status(400).json({ error: "One or more selected tenants could not be found" });
   }
 
-  await setAdminSetting("billing_rent", rent);
-  await setAdminSetting("billing_water", water);
-  await setAdminSetting("billing_trash", trash);
-  await setAdminSetting("billing_electricity", electricity);
-  const users = await applyGlobalBilling({
+  await setScopedAdminSetting(req.adminProperty.id, "billing_rent", rent);
+  await setScopedAdminSetting(req.adminProperty.id, "billing_water", water);
+  await setScopedAdminSetting(req.adminProperty.id, "billing_trash", trash);
+  await setScopedAdminSetting(req.adminProperty.id, "billing_electricity", electricity);
+  await applyGlobalBilling({
     rent,
     water,
     trash,
     electricity,
     userIds: selectedUsers.map((user) => user.id),
   });
-  const expectedTotal = await getExpectedCollectionTotal(users);
-  await setAdminSetting("expected_collection_total", expectedTotal);
+  const expectedTotal = await getExpectedCollectionTotal(null, req.adminProperty.id);
+  await setScopedAdminSetting(req.adminProperty.id, "expected_collection_total", expectedTotal);
 
   res.json({
     success: true,
-    billing: await getBillingConfig(),
+    billing: await getBillingConfig(req.adminProperty.id),
     expected_collection_total: expectedTotal,
     applied_count: selectedUsers.length,
     applied_tenant_ids: tenantIds,
@@ -1472,6 +1539,11 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, asyncHandler(asy
     return res.status(404).json({ error: "Payment not found" });
   }
 
+  const user = await getUserById(payment.user_id);
+  if (!assertUserInAdminProperty(user, req)) {
+    return res.status(404).json({ error: "Payment not found" });
+  }
+
   const status = String(req.body?.status || "").trim();
   if (!["APPROVED", "DISAPPROVED"].includes(status)) {
     return res.status(400).json({ error: "status must be APPROVED or DISAPPROVED" });
@@ -1481,13 +1553,13 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, asyncHandler(asy
   }
 
   const reviewNote = String(req.body?.review_note || "").trim();
-  const user = (await listUsers()).find((item) => item.id === payment.user_id);
   const updated = await updatePaymentRequestStatus(payment.id, status, reviewNote);
 
   if (status === "APPROVED") {
     const refreshed = await adjustUserBalance(payment.user_id, payment.payment_for, payment.amount);
-    const acquiredCollection = Number((await getAdminSetting("acquired_collection_total", "0")) || 0) + Number(payment.amount || 0);
-    await setAdminSetting("acquired_collection_total", acquiredCollection);
+    const acquiredCollection =
+      Number((await getScopedAdminSetting(req.adminProperty.id, "acquired_collection_total", "0")) || 0) + Number(payment.amount || 0);
+    await setScopedAdminSetting(req.adminProperty.id, "acquired_collection_total", acquiredCollection);
     await addTransaction(payment.user_id, {
       amount: payment.amount,
       date_created: new Date().toISOString(),
@@ -1523,22 +1595,7 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, asyncHandler(asy
 }));
 
 app.get("/api/admin/tickets", requireAdminSession, asyncHandler(async (req, res) => {
-  const users = await listUsers();
-  const ticketNested = await Promise.all(
-    users.map(async (tenant) =>
-      (await listMaintenanceForUser(tenant.id)).map((ticket) => ({
-        ...ticket,
-        tenant_name: `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name,
-        tenant_id: tenant.tenant_id,
-        house_number: tenant.house_number,
-        floor_number: tenant.floor_number,
-        property_name: tenant.property_name,
-      }))
-    )
-  );
-  const tickets = ticketNested.flat();
-
-  res.json({ tickets });
+  res.json(await buildAdminTicketsPayload(null, req.adminProperty.id));
 }));
 
 app.post("/api/admin/tickets/:id/status", requireAdminSession, asyncHandler(async (req, res) => {
@@ -1566,6 +1623,16 @@ app.post("/api/admin/tickets/:id/status", requireAdminSession, asyncHandler(asyn
     }
   } catch (error) {
     return res.status(400).json({ error: error.message });
+  }
+
+  const existingTicket = await getMaintenanceTicketById(req.params.id);
+  if (!existingTicket) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+
+  const user = await getUserById(existingTicket.user_id);
+  if (!assertUserInAdminProperty(user, req)) {
+    return res.status(404).json({ error: "Ticket not found" });
   }
 
   const ticket = await updateMaintenanceTicketStatus(

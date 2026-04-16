@@ -448,6 +448,48 @@ async function main() {
     });
     assert.equal(refreshedTenantTickets.response.status, 200, "Tenant tickets endpoint should still work");
 
+    const adminTenantAccountUpdate = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/billing`, {
+      method: "POST",
+      cookie: adminCookie,
+      body: {
+        rent: "50",
+        water: "5",
+        trash: "0",
+        electricity: "0",
+        deposit: "456",
+      },
+    });
+    assert.equal(adminTenantAccountUpdate.response.status, 200, "Admin should update tenant deposit and payable amounts");
+    assert.equal(Number(adminTenantAccountUpdate.data.tenant.deposit || 0), 456, "Admin tenant update should save the new deposit");
+    assert.equal(Number(adminTenantAccountUpdate.data.tenant.account_balance || 0), 55, "Admin tenant update should recalculate the balance");
+
+    const adminTenantBalanceReset = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/billing`, {
+      method: "POST",
+      cookie: adminCookie,
+      body: {
+        rent: "50",
+        water: "5",
+        trash: "0",
+        electricity: "0",
+        deposit: "456",
+        reset_account_balance: true,
+      },
+    });
+    assert.equal(adminTenantBalanceReset.response.status, 200, "Admin should reset tenant account balance to zero");
+    assert.equal(Number(adminTenantBalanceReset.data.tenant.deposit || 0), 456, "Reset should preserve the updated deposit");
+    assert.equal(Number(adminTenantBalanceReset.data.tenant.account_balance || 0), 0, "Reset should clear the tenant account balance");
+    assert.equal(Number(adminTenantBalanceReset.data.bills.total || 0), 0, "Reset should clear the tenant bill breakdown");
+
+    const tenantPaymentOptionsAfterReset = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
+      method: "POST",
+      ...tenantAuth(tenantSession),
+    });
+    assert.equal(
+      Number(tenantPaymentOptionsAfterReset.data.bill_breakdown.total || 0),
+      0,
+      "Tenant payment options should show a cleared balance after admin reset"
+    );
+
     const benchmarks = [];
     benchmarks.push(
       await benchmark("health", 120, 12, async () => {

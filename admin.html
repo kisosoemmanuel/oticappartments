@@ -634,17 +634,25 @@ function renderTenantDetail() {
               <div class="muted">Electricity: ${esc(money(bills.electricity || 0))}</div>
             </article>
             <article class="item">
-              <strong>Edit Payable Amounts</strong>
+              <strong>Edit Account Values</strong>
               <form class="stack tenantBillingForm" data-tenant="${esc(tenant.tenant_id || "")}" style="margin-top:10px;">
                 <div class="filters">
                   <div><label>Rent</label><input name="rent" type="number" min="0" step="0.01" value="${esc(Number(bills.rent || 0))}" /></div>
                   <div><label>Water</label><input name="water" type="number" min="0" step="0.01" value="${esc(Number(bills.water || 0))}" /></div>
                   <div><label>Trash</label><input name="trash" type="number" min="0" step="0.01" value="${esc(Number(bills.trash || 0))}" /></div>
                   <div><label>Electricity</label><input name="electricity" type="number" min="0" step="0.01" value="${esc(Number(bills.electricity || 0))}" /></div>
+                  <div><label>Deposit</label><input name="deposit" type="number" min="0" step="0.01" value="${esc(Number(tenant.deposit || 0))}" /></div>
                 </div>
-                <div class="muted">The total account balance recalculates automatically from these values.</div>
+                <label class="item" style="display:flex;gap:12px;align-items:flex-start;margin:0;padding:14px;cursor:pointer;">
+                  <input name="reset_account_balance" type="checkbox" value="true" style="margin-top:4px;" />
+                  <span>
+                    <strong>Reset outstanding balance to 0</strong>
+                    <div class="muted" style="margin-top:6px;">Saving with this selected clears the tenant's current rent, water, trash, and electricity payable amounts to zero.</div>
+                  </span>
+                </label>
+                <div class="muted">The total account balance recalculates automatically from the payable amounts you save here.</div>
                 <div class="muted">Rent reminders show until the 7th. Late-payment alerts start 5 days later if no payment is recorded.</div>
-                <button class="btn secondary" type="submit">Save Payable Amounts</button>
+                <button class="btn secondary" type="submit">Save Account Values</button>
               </form>
             </article>
             <article class="item">
@@ -1174,13 +1182,17 @@ async function saveTenantBilling(event) {
   }
 
   const payload = Object.fromEntries(new FormData(form).entries());
+  const resetAccountBalance = payload.reset_account_balance === "true";
   await fetchJson(`/api/admin/tenants/${encodeURIComponent(tenantId)}/billing`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   await loadAllData({ force: true });
-  setStatus("Tenant payable amounts updated.", false);
+  setStatus(
+    resetAccountBalance ? "Tenant account values updated and balance reset to 0." : "Tenant account values updated.",
+    false
+  );
 }
 
 async function sendMessage(event) {

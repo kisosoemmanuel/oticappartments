@@ -482,6 +482,14 @@ function parseNonNegativeMoney(value, fieldName) {
   return String(amount);
 }
 
+function parseBooleanFlag(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
 async function getExpectedCollectionTotal(users = null, propertyId = null) {
   const resolvedUsers = users || (await listUsers({ propertyId }));
   let total = 0;
@@ -1317,21 +1325,26 @@ app.post("/api/admin/tenants/:tenantId/billing", requireAdminSession, asyncHandl
   let water;
   let trash;
   let electricity;
+  let deposit;
 
   try {
     rent = parseNonNegativeMoney(req.body?.rent, "rent");
     water = parseNonNegativeMoney(req.body?.water, "water");
     trash = parseNonNegativeMoney(req.body?.trash, "trash");
     electricity = parseNonNegativeMoney(req.body?.electricity, "electricity");
+    deposit = parseNonNegativeMoney(req.body?.deposit ?? user.deposit, "deposit");
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
 
+  const resetAccountBalance = parseBooleanFlag(req.body?.reset_account_balance);
   const updatedTenant = await updateUserBilling(user.id, {
     rent,
     water,
     trash,
     electricity,
+    deposit,
+    resetAccountBalance,
   });
   const expectedTotal = await getExpectedCollectionTotal(null, req.adminProperty.id);
   await setScopedAdminSetting(req.adminProperty.id, "expected_collection_total", expectedTotal);
@@ -1341,6 +1354,7 @@ app.post("/api/admin/tenants/:tenantId/billing", requireAdminSession, asyncHandl
     tenant: sanitizeUser(updatedTenant),
     bills: await getTenantBillBreakdown(updatedTenant),
     expected_collection_total: expectedTotal,
+    reset_account_balance: resetAccountBalance,
   });
 }));
 

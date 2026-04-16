@@ -758,31 +758,38 @@ export async function applyGlobalBilling({ rent = 0, water = 0, trash = 0, elect
   return listUsers();
 }
 
-export async function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, electricity = 0 }) {
+export async function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, electricity = 0, deposit = 0, resetAccountBalance = false }) {
   const user = await getUserById(userId);
   if (!user) return null;
 
-  const total = Number(rent) + Number(water) + Number(trash) + Number(electricity);
+  const nextRent = resetAccountBalance ? 0 : Number(rent);
+  const nextWater = resetAccountBalance ? 0 : Number(water);
+  const nextTrash = resetAccountBalance ? 0 : Number(trash);
+  const nextElectricity = resetAccountBalance ? 0 : Number(electricity);
+  const nextDeposit = Number(deposit);
+  const total = nextRent + nextWater + nextTrash + nextElectricity;
   await query(
     `
       UPDATE users
       SET rent = $1,
           bill = $2,
-          rent_balance = $3,
-          water_balance = $4,
-          trash_balance = $5,
-          electricity_balance = $6,
-          account_balance = $7,
-          arrears = $8
-      WHERE id = $9
+          deposit = $3,
+          rent_balance = $4,
+          water_balance = $5,
+          trash_balance = $6,
+          electricity_balance = $7,
+          account_balance = $8,
+          arrears = $9
+      WHERE id = $10
     `,
     [
-      String(rent),
-      String(water),
-      String(rent),
-      String(water),
-      String(trash),
-      String(electricity),
+      String(nextRent),
+      String(nextWater),
+      String(nextDeposit),
+      String(nextRent),
+      String(nextWater),
+      String(nextTrash),
+      String(nextElectricity),
       String(total),
       String(total),
       userId,

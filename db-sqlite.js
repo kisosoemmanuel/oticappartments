@@ -746,16 +746,22 @@ export function applyGlobalBilling({ rent = 0, water = 0, trash = 0, electricity
   return listUsers();
 }
 
-export function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, electricity = 0 }) {
+export function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, electricity = 0, deposit = 0, resetAccountBalance = false }) {
   const user = getUserById(userId);
   if (!user) return null;
 
-  const total = Number(rent) + Number(water) + Number(trash) + Number(electricity);
+  const nextRent = resetAccountBalance ? 0 : Number(rent);
+  const nextWater = resetAccountBalance ? 0 : Number(water);
+  const nextTrash = resetAccountBalance ? 0 : Number(trash);
+  const nextElectricity = resetAccountBalance ? 0 : Number(electricity);
+  const nextDeposit = Number(deposit);
+  const total = nextRent + nextWater + nextTrash + nextElectricity;
   db.prepare(
     `
       UPDATE users
       SET rent = ?,
           bill = ?,
+          deposit = ?,
           rent_balance = ?,
           water_balance = ?,
           trash_balance = ?,
@@ -765,12 +771,13 @@ export function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, elec
       WHERE id = ?
     `
   ).run(
-    String(rent),
-    String(water),
-    String(rent),
-    String(water),
-    String(trash),
-    String(electricity),
+    String(nextRent),
+    String(nextWater),
+    String(nextDeposit),
+    String(nextRent),
+    String(nextWater),
+    String(nextTrash),
+    String(nextElectricity),
     String(total),
     String(total),
     userId

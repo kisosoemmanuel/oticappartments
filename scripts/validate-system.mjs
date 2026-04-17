@@ -316,6 +316,7 @@ async function main() {
         amount: "123",
         phone_number: "0711111111",
         reference: `VAL${tenantSeed}`,
+        payment_time: "2026-04-17T09:30:00+03:00",
         payment_for: "RENT",
         note: "Validation payment",
       },
@@ -371,6 +372,7 @@ async function main() {
     const adminPayments = await request(baseUrl, "/api/admin/payments", { cookie: adminCookie });
     const createdPayment = adminPayments.data.payments.find((item) => item.tenant_id === createdTenantId && item.reference === `VAL${tenantSeed}`);
     assert(createdPayment, "Admin should see tenant payment");
+    assert(createdPayment.payment_time, "Admin should see tenant payment time");
 
     const paymentReview = await request(baseUrl, `/api/admin/payments/${createdPayment.id}/review`, {
       method: "POST",

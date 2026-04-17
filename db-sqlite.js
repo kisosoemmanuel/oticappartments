@@ -176,6 +176,7 @@ export function initDb() {
       amount TEXT NOT NULL,
       phone_number TEXT,
       reference TEXT,
+      payment_time TEXT,
       status TEXT DEFAULT 'PENDING',
       note TEXT,
       created_at TEXT DEFAULT (datetime('now')),
@@ -183,6 +184,7 @@ export function initDb() {
     );
   `);
   ensureColumn("payment_requests", "payment_for", "TEXT");
+  ensureColumn("payment_requests", "payment_time", "TEXT");
   ensureColumn("payment_requests", "reviewed_at", "TEXT");
   ensureColumn("payment_requests", "review_note", "TEXT");
   ensureColumn("payment_requests", "receipt_number", "TEXT");
@@ -856,13 +858,13 @@ export function getActiveLeaseForUser(userId) {
 
 export function addPaymentRequest(
   userId,
-  { method, amount, phone_number, reference, payment_for = "RENT", status = "PENDING", note }
+  { method, amount, phone_number, reference, payment_time, payment_for = "RENT", status = "PENDING", note }
 ) {
   return db
     .prepare(
-      "INSERT INTO payment_requests (user_id, method, amount, phone_number, reference, payment_for, status, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO payment_requests (user_id, method, amount, phone_number, reference, payment_time, payment_for, status, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .run(userId, method, amount, phone_number, reference, payment_for, status, note);
+    .run(userId, method, amount, phone_number, reference, payment_time, payment_for, status, note);
 }
 
 export function listPaymentRequestsForUser(userId) {

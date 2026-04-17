@@ -657,7 +657,11 @@ function renderView(view, data) {
             </div>
             <div class="field">
               <label for="paymentReference">M-PESA confirmation code</label>
-              <input class="input" id="paymentReference" placeholder="e.g. QWE123ABC9" />
+              <input class="input" id="paymentReference" placeholder="e.g. QWE123ABC9" required />
+            </div>
+            <div class="field">
+              <label for="paymentTime">Time paid</label>
+              <input class="input" id="paymentTime" type="datetime-local" required />
             </div>
             <div class="field">
               <label for="paymentNote">Optional note</label>
@@ -677,7 +681,8 @@ function renderView(view, data) {
                   <strong>${escapeHtml(item.method)}</strong>
                   <div class="muted">For: ${escapeHtml(item.payment_for || "RENT")}</div>
                   <div>${escapeHtml(formatMoney(item.amount))}</div>
-                  <div class="muted">${escapeHtml(item.status)} | ${escapeHtml(item.reference || "No reference")}</div>
+                  <div class="muted">${escapeHtml(item.status)} | Confirmation Code: ${escapeHtml(item.reference || "Not provided")}</div>
+                  <div class="muted">Time Paid: ${escapeHtml(formatDate(item.payment_time || item.created_at))}</div>
                   <div class="muted">${escapeHtml(item.note || "")}</div>
                   <div class="muted">${escapeHtml(formatDate(item.created_at))}</div>
                 </article>
@@ -1018,7 +1023,18 @@ async function handlePaymentSubmit(event) {
     const amount = document.getElementById("paymentAmount").value.trim();
     const phone_number = document.getElementById("paymentPhone").value.trim();
     const reference = document.getElementById("paymentReference").value.trim();
+    const paymentTimeValue = document.getElementById("paymentTime").value.trim();
     const note = document.getElementById("paymentNote").value.trim();
+    if (!reference) {
+      throw new Error("Enter the M-PESA confirmation code before submitting.");
+    }
+    if (!paymentTimeValue) {
+      throw new Error("Enter the time you made the payment before submitting.");
+    }
+    const payment_time = new Date(paymentTimeValue);
+    if (Number.isNaN(payment_time.getTime())) {
+      throw new Error("Enter a valid payment time before submitting.");
+    }
     await api("/api/pegasus/visionary/mpesa/StkPush", {
       body: {
         ...getBody(),
@@ -1027,6 +1043,7 @@ async function handlePaymentSubmit(event) {
         amount,
         phone_number,
         reference,
+        payment_time: payment_time.toISOString(),
         note,
       },
     });

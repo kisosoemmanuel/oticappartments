@@ -482,6 +482,20 @@ function parseNonNegativeMoney(value, fieldName) {
   return String(amount);
 }
 
+function parseRequiredDateTime(value, fieldName) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    throw new Error(`${fieldName} is required`);
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`${fieldName} must be a valid date and time`);
+  }
+
+  return parsed.toISOString();
+}
+
 function parseBooleanFlag(value) {
   if (typeof value === "boolean") {
     return value;
@@ -759,7 +773,7 @@ app.post("/api/pegasus/visionary/tenant/payments/options", asyncHandler(async (r
         `Select Pay Bill and enter ${MPESA_PAYBILL_NUMBER}.`,
         `Use ${MPESA_ACCOUNT_NUMBER} as the account number.`,
         "Enter the amount you are paying and complete the transaction.",
-        "Return to the portal and submit the M-PESA confirmation code for verification.",
+        "Return to the portal and submit the M-PESA confirmation code and payment time for verification.",
       ],
     },
   });
@@ -871,14 +885,27 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", asyncHandler(async (req, res) =
   const amount = String(req.body?.amount || user.rent || "0");
   const method = "M-PESA Paybill";
   const phone_number = req.body?.phone_number || user.phone_number || "";
-  const reference = String(req.body?.reference || "").trim() || `MPESA-PENDING-${Date.now()}`;
+  const reference = String(req.body?.reference || "").trim();
+  const payment_time_raw = req.body?.payment_time;
   const payment_for = String(req.body?.payment_for || "RENT").toUpperCase();
+  let payment_time;
+
+  if (!reference) {
+    return res.status(400).json({ error: "reference is required" });
+  }
+
+  try {
+    payment_time = parseRequiredDateTime(payment_time_raw, "payment_time");
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 
   await addPaymentRequest(user.id, {
     method,
     amount,
     phone_number,
     reference,
+    payment_time,
     payment_for,
     status: "PENDING_CONFIRMATION",
     note:
@@ -903,6 +930,7 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", asyncHandler(async (req, res) =
       `Dear ${user.first_name || "Tenant"},\n\n` +
       `We have received your Paybill payment confirmation for KSH: ${Number(amount || 0).toFixed(2)}.\n` +
       `M-PESA Code: ${reference}\n` +
+      `Payment Time: ${payment_time}\n` +
       `Payment For: ${payment_for}\n` +
       `Paybill: ${MPESA_PAYBILL_NUMBER}\n` +
       `Account: ${MPESA_ACCOUNT_NUMBER}\n\n` +
@@ -913,6 +941,7 @@ app.post("/api/pegasus/visionary/mpesa/StkPush", asyncHandler(async (req, res) =
     success: true,
     Message: "Payment confirmation submitted successfully",
     reference,
+    payment_time,
     method,
   });
 }));

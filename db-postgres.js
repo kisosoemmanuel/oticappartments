@@ -237,12 +237,14 @@ export async function initDb() {
       amount TEXT NOT NULL,
       phone_number TEXT,
       reference TEXT,
+      payment_time TIMESTAMPTZ,
       status TEXT DEFAULT 'PENDING',
       note TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
   await ensureColumn("payment_requests", "payment_for", "TEXT");
+  await ensureColumn("payment_requests", "payment_time", "TIMESTAMPTZ");
   await ensureColumn("payment_requests", "reviewed_at", "TIMESTAMPTZ");
   await ensureColumn("payment_requests", "review_note", "TEXT");
   await ensureColumn("payment_requests", "receipt_number", "TEXT");
@@ -871,11 +873,11 @@ export async function getActiveLeaseForUser(userId) {
 
 export async function addPaymentRequest(
   userId,
-  { method, amount, phone_number, reference, payment_for = "RENT", status = "PENDING", note }
+  { method, amount, phone_number, reference, payment_time, payment_for = "RENT", status = "PENDING", note }
 ) {
   return query(
-    "INSERT INTO payment_requests (user_id, method, amount, phone_number, reference, payment_for, status, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-    [userId, method, amount, phone_number, reference, payment_for, status, note]
+    "INSERT INTO payment_requests (user_id, method, amount, phone_number, reference, payment_time, payment_for, status, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+    [userId, method, amount, phone_number, reference, payment_time, payment_for, status, note]
   );
 }
 

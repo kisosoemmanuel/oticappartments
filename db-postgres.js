@@ -760,6 +760,51 @@ export async function applyGlobalBilling({ rent = 0, water = 0, trash = 0, elect
   return listUsers();
 }
 
+export async function applyBulkTenantBalanceAction({ action, userIds = [] }) {
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  const normalizedUserIds = [...new Set((userIds || []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+
+  if (!normalizedUserIds.length) {
+    return [];
+  }
+
+  if (normalizedAction === "reset") {
+    await query(
+      `
+        UPDATE users
+        SET rent_balance = '0',
+            water_balance = '0',
+            trash_balance = '0',
+            electricity_balance = '0',
+            account_balance = '0',
+            arrears = '0'
+        WHERE id = ANY($1::bigint[])
+      `,
+      [normalizedUserIds]
+    );
+    return normalizedUserIds;
+  }
+
+  if (normalizedAction === "rent_due") {
+    await query(
+      `
+        UPDATE users
+        SET rent_balance = COALESCE(NULLIF(BTRIM(rent), ''), '0'),
+            water_balance = '0',
+            trash_balance = '0',
+            electricity_balance = '0',
+            account_balance = COALESCE(NULLIF(BTRIM(rent), ''), '0'),
+            arrears = COALESCE(NULLIF(BTRIM(rent), ''), '0')
+        WHERE id = ANY($1::bigint[])
+      `,
+      [normalizedUserIds]
+    );
+    return normalizedUserIds;
+  }
+
+  throw new Error(`Unsupported bulk tenant balance action: ${action}`);
+}
+
 export async function updateUserBilling(userId, { rent = 0, water = 0, trash = 0, electricity = 0, deposit = 0, resetAccountBalance = false }) {
   const user = await getUserById(userId);
   if (!user) return null;

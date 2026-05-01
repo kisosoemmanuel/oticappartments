@@ -11,6 +11,7 @@ import {
   addAlert,
   addSharedDocument,
   addMaintenanceTicket,
+  applyBulkTenantBalanceAction,
   addMessage,
   addPaymentRequest,
   addVacateNotice,
@@ -1384,6 +1385,38 @@ app.post("/api/admin/tenants/:tenantId/billing", requireAdminSession, asyncHandl
     bills: await getTenantBillBreakdown(updatedTenant),
     expected_collection_total: expectedTotal,
     reset_account_balance: resetAccountBalance,
+  });
+}));
+
+app.post("/api/admin/tenants/balances/bulk", requireAdminSession, asyncHandler(async (req, res) => {
+  const action = String(req.body?.action || "").trim().toLowerCase();
+  if (!["reset", "rent_due"].includes(action)) {
+    return res.status(400).json({ error: "action must be reset or rent_due" });
+  }
+
+  const users = await listUsers({ propertyId: req.adminProperty.id });
+  if (!users.length) {
+    return res.json({
+      success: true,
+      action,
+      applied_count: 0,
+      expected_collection_total: 0,
+    });
+  }
+
+  await applyBulkTenantBalanceAction({
+    action,
+    userIds: users.map((user) => user.id),
+  });
+
+  const expectedTotal = await getExpectedCollectionTotal(null, req.adminProperty.id);
+  await setScopedAdminSetting(req.adminProperty.id, "expected_collection_total", expectedTotal);
+
+  res.json({
+    success: true,
+    action,
+    applied_count: users.length,
+    expected_collection_total: expectedTotal,
   });
 }));
 

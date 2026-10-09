@@ -79,30 +79,16 @@
       .filters button { background: var(--primary); color: white; border-color: var(--primary); cursor: pointer; }
       .tenant-row { cursor: pointer; }
       .tenant-row:hover { background: #f7fafe; }
-      .drawer-backdrop { position: fixed; inset: 0; background: rgba(15,24,39,0.5); display: none; padding: 18px; z-index: 30; }
+      .drawer-backdrop { position: fixed; inset: 0; background: rgba(15,24,39,0.38); display: none; z-index: 1000; }
       .drawer-backdrop.visible { display: block; }
-      .drawer { position: relative; width: min(1180px, 100%); height: calc(100vh - 36px); margin: 0 auto; background: white; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(17, 30, 45, 0.18); transform: translateY(18px); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; padding: 20px; overflow: auto; border-radius: 24px; }
-      .drawer.open { transform: translateY(0); opacity: 1; }
-      .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px; }
+      .drawer { position: fixed; top: 0; right: 0; width: min(520px, 100%); height: 100vh; background: white; border-left: 1px solid var(--border); box-shadow: -12px 0 30px rgba(17, 30, 45, 0.08); transform: translateX(100%); transition: transform 0.2s ease; padding: 20px; overflow: auto; z-index: 1001; }
+      .drawer.open { transform: translateX(0); }
+      .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
       .close-btn { border: none; background: var(--surface-soft); color: var(--text); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+      .drawer-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
       .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
       .detail-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #f9fbff; }
       .detail-box strong { display: block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-      .fullscreen-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 18px; align-items: start; }
-      .detail-stack { display: grid; gap: 12px; }
-      .tenant-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-      .tenant-editor-grid .field-stack:last-child:nth-child(odd) { grid-column: 1 / -1; }
-      .drawer-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-      .alerts-shell { display: grid; gap: 16px; }
-      .alerts-toolbar { display: flex; justify-content: space-between; align-items: end; gap: 14px; flex-wrap: wrap; }
-      .alerts-history { border: 1px solid var(--border); border-radius: 16px; background: #f7fbfb; min-height: 360px; max-height: 62vh; overflow: auto; padding: 16px; display: grid; gap: 12px; }
-      .alert-bubble { max-width: min(760px, 100%); border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: white; box-shadow: 0 8px 20px rgba(7, 58, 58, 0.06); }
-      .alert-bubble.is-self { margin-left: auto; background: #eaf9f9; border-color: #aee6e6; }
-      .alert-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 0.82rem; margin-bottom: 8px; }
-      .alert-body { white-space: pre-wrap; line-height: 1.5; }
-      .alerts-compose { display: grid; gap: 12px; }
-      .alerts-compose textarea { width: 100%; min-height: 130px; resize: vertical; border: 1px solid var(--border); border-radius: 16px; padding: 14px; font: inherit; background: white; }
-      .alerts-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
       .document-upload { display: grid; gap: 12px; }
       .document-forms { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
       .document-forms input, .document-forms select { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; width: 180px; }
@@ -205,15 +191,7 @@
         border-color: #eaa126;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
-      @media (max-width: 900px) {
-        .app { grid-template-columns: 1fr; }
-        .two-col { grid-template-columns: 1fr; }
-        .topbar { flex-direction: column; align-items: flex-start; }
-        .fullscreen-layout,
-        .tenant-editor-grid { grid-template-columns: 1fr; }
-        .drawer-backdrop { padding: 10px; }
-        .drawer { height: calc(100vh - 20px); padding: 16px; }
-      }
+      @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .two-col { grid-template-columns: 1fr; } .topbar { flex-direction: column; align-items: flex-start; } }
     </style>
   </head>
   <body>
@@ -226,10 +204,10 @@
         <nav class="nav" aria-label="Sidebar navigation">
           <button class="nav-btn active" data-target="overview">Overview</button>
           <button class="nav-btn" data-target="tenants">Tenants</button>
-          <button class="nav-btn" data-target="alerts">Alerts</button>
           <button class="nav-btn" data-target="documents">Documents</button>
           <button class="nav-btn" data-target="payment">Payment</button>
           <button class="nav-btn" data-target="reports">Reports</button>
+          <button class="nav-btn" data-target="alerts">Alerts</button>
           <button class="nav-btn" data-target="utilities">Utilities</button>
         </nav>
         <button id="logoutBtn" class="logout" type="button">Logout</button>
@@ -314,35 +292,6 @@
           </div>
         </section>
 
-        <section id="alertsPage" class="page">
-          <div class="panel">
-            <div class="panel-header">
-              <h2>Admin alerts</h2>
-              <span id="alertsBadge" class="pill warning">Private channel</span>
-            </div>
-            <div class="alerts-shell">
-              <div class="alerts-toolbar">
-                <div>
-                  <div class="eyebrow">Visibility</div>
-                  <div id="alertsContext" class="muted-block">Only the sender and the superadmin can view each alert thread.</div>
-                </div>
-                <label id="alertsThreadPicker" class="field-stack" hidden>
-                  <span>Property admin thread</span>
-                  <select id="alertsThreadSelect" class="modern-select"></select>
-                </label>
-              </div>
-              <div id="alertsHistory" class="alerts-history"><div class="empty-state">Loading alerts…</div></div>
-              <div class="alerts-compose">
-                <textarea id="alertMessageInput" placeholder="Type an internal alert or reply here."></textarea>
-                <div class="alerts-footer">
-                  <div class="muted-block" id="alertsHint">Messages keep their full date and time history.</div>
-                  <button id="sendAlertBtn" class="secondary-btn" type="button">Send alert</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section id="documentsPage" class="page">
           <div class="panel document-upload">
             <div class="panel-header"><h2>Shared documents</h2><span class="pill info" id="documentBadge">OTIC 1</span></div>
@@ -376,6 +325,29 @@
                 <tbody id="reportTable"></tbody>
               </table>
             </div>
+          </div>
+        </section>
+
+        <section id="alertsPage" class="page">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Admin alerts</h2>
+              <span class="pill info" id="alertsBadge">Messages</span>
+            </div>
+            <div class="alert-composer">
+              <label id="alertThreadOwnerGroup" class="field-stack is-hidden">
+                <span>Reply to admin</span>
+                <select id="alertThreadOwnerSelect"></select>
+              </label>
+              <label class="field-stack">
+                <span>Message</span>
+                <textarea id="alertMessageInput" class="text-input" rows="4" placeholder="Write an update for the property team..."></textarea>
+              </label>
+              <div class="drawer-actions">
+                <button id="sendAlertBtn" class="secondary-btn" type="button">Send alert</button>
+              </div>
+            </div>
+            <div id="alertThreadList" class="alert-thread-list"></div>
           </div>
         </section>
 
@@ -508,12 +480,10 @@
         session: null,
         bootstrap: null,
         reports: null,
-        alerts: { threads: [], messages: [], current_thread_owner_admin_user_id: null, loaded: false },
         ledger: { month_key: new Date().toISOString().slice(0, 7), selected_floor: null, floors: [], rows: [], summary: null, water_rate: 0 },
         overviewMonthKey: new Date().toISOString().slice(0, 7),
         overviewMonthlySummary: null,
         activePage: 'overview',
-        activeTenantDetail: null,
         tenantSearch: '',
         tenantFloor: '',
         utilityTab: 'water',
@@ -541,13 +511,6 @@
         const month = String(parsed.getMonth() + 1).padStart(2, '0');
         const year = parsed.getFullYear();
         return `${day}/${month}/${year}`;
-      }
-
-      function formatDateTime(value) {
-        if (!value) return '—';
-        const parsed = new Date(value);
-        if (Number.isNaN(parsed.getTime())) return '—';
-        return new Intl.DateTimeFormat('en-KE', { dateStyle: 'medium', timeStyle: 'short' }).format(parsed);
       }
 
       function formatMonthLabel(monthKey) {
@@ -720,14 +683,14 @@
         });
       }
 
-      async function setPage(target) {
+      function setPage(target) {
         state.activePage = target;
         pageTitleEl.textContent = {
           overview: 'Overview',
           tenants: 'Tenants',
-          alerts: 'Alerts',
           documents: 'Documents',
           reports: 'Reports',
+          alerts: 'Alerts',
           payment: 'Payment',
           utilities: 'Utilities',
         }[target] || 'Overview';
@@ -735,9 +698,6 @@
           page.classList.toggle('active', page.id === `${target}Page`);
         });
         renderNav();
-        if (target === 'alerts') {
-          await ensureAlertsLoaded();
-        }
       }
 
       function renderTenantFloorOptions() {
@@ -828,153 +788,43 @@
         document.getElementById('tenantTableBody').innerHTML = users.length
           ? users.map((tenant) => {
               const name = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.first_name || 'Tenant';
-              return `<tr class="tenant-row" data-tenant-id="${escapeHtml(tenant.tenant_id || '')}"><td>${escapeHtml(name)}</td><td>${escapeHtml(formatFloorLabel(tenant.floor_number || '-'))}</td><td>${escapeHtml(tenant.house_number || '-')}</td><td>${escapeHtml(tenant.phone_number || '-')}</td><td>${formatMoney(tenant.rent_balance || tenant.rent || 0)}</td><td>${formatMoney(tenant.deposit || 0)}</td></tr>`;
+              return `<tr class="tenant-row" data-tenant-id="${tenant.id}"><td>${escapeHtml(name)}</td><td>${escapeHtml(formatFloorLabel(tenant.floor_number || '-'))}</td><td>${escapeHtml(tenant.house_number || '-')}</td><td>${escapeHtml(tenant.phone_number || '-')}</td><td>${formatMoney(tenant.rent_balance || tenant.rent || 0)}</td><td>${formatMoney(tenant.deposit || 0)}</td></tr>`;
             }).join('')
           : '<tr><td colspan="6">No tenants found on the selected floor.</td></tr>';
       }
 
-      function updateTenantInState(updatedUser) {
-        if (!state.bootstrap?.users?.users) {
-          return;
-        }
-        state.bootstrap.users.users = state.bootstrap.users.users.map((tenant) =>
-          String(tenant.tenant_id || '') === String(updatedUser.tenant_id || '') ? updatedUser : tenant
-        );
-      }
-
-      function renderTenantDrawer() {
-        const detail = state.activeTenantDetail;
-        if (!detail?.tenant) {
-          document.getElementById('tenantDrawerTitle').textContent = 'Tenant details';
-          document.getElementById('tenantDrawerContent').innerHTML = '<div class="empty-state">Tenant details unavailable.</div>';
-          return;
-        }
-
-        const tenant = detail.tenant;
-        const bills = detail.bills || {};
-        const summary = detail.summary || {};
+      function openTenantDrawer(tenantId) {
+        const tenant = currentUsers().find((item) => Number(item.id) === Number(tenantId));
+        if (!tenant) return;
         const name = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.first_name || 'Tenant';
         document.getElementById('tenantDrawerTitle').textContent = name;
         document.getElementById('tenantDrawerContent').innerHTML = `
-          <div class="fullscreen-layout">
-            <div class="detail-stack">
-              <div class="detail-grid">
-                <div class="detail-box"><strong>Tenant ID</strong><span>${escapeHtml(tenant.tenant_id || '-')}</span></div>
-                <div class="detail-box"><strong>Property</strong><span>${escapeHtml(tenant.property_name || '-')}</span></div>
-                <div class="detail-box"><strong>Balance</strong><span>${formatMoney(tenant.account_balance || 0)}</span></div>
-                <div class="detail-box"><strong>Rent Due</strong><span>${formatMoney(bills.rent || tenant.rent || 0)}</span></div>
-                <div class="detail-box"><strong>Water</strong><span>${formatMoney(bills.water || 0)}</span></div>
-                <div class="detail-box"><strong>Trash</strong><span>${formatMoney(bills.trash || 0)}</span></div>
-              </div>
-              <div class="detail-grid">
-                <div class="detail-box"><strong>Unread messages</strong><span>${Number(summary.unread_messages || 0)}</span></div>
-                <div class="detail-box"><strong>Open tickets</strong><span>${Number(summary.open_tickets || 0)}</span></div>
-                <div class="detail-box"><strong>Pending notices</strong><span>${Number(summary.pending_notices || 0)}</span></div>
-                <div class="detail-box"><strong>Pending payments</strong><span>${Number(summary.pending_payments || 0)}</span></div>
-              </div>
+          <form class="tenant-edit-form" data-tenant-id="${tenant.id}">
+            <div class="detail-grid">
+              <label class="field-stack"><span>First name</span><input class="text-input" name="first_name" value="${escapeHtml(tenant.first_name || '')}" /></label>
+              <label class="field-stack"><span>Last name</span><input class="text-input" name="last_name" value="${escapeHtml(tenant.last_name || '')}" /></label>
+              <label class="field-stack"><span>Phone</span><input class="text-input" name="phone_number" value="${escapeHtml(tenant.phone_number || '')}" /></label>
+              <label class="field-stack"><span>Email</span><input class="text-input" name="email_address" value="${escapeHtml(tenant.email_address || '')}" /></label>
+              <label class="field-stack"><span>Floor</span><input class="text-input" name="floor_number" value="${escapeHtml(tenant.floor_number || '')}" /></label>
+              <label class="field-stack"><span>House number</span><input class="text-input" name="house_number" value="${escapeHtml(tenant.house_number || '')}" /></label>
+              <label class="field-stack"><span>Rent</span><input class="money-input" name="rent" type="number" min="0" step="0.01" value="${Number(tenant.rent || tenant.rent_balance || 0).toFixed(2)}" /></label>
+              <label class="field-stack"><span>Deposit</span><input class="money-input" name="deposit" type="number" min="0" step="0.01" value="${Number(tenant.deposit || 0).toFixed(2)}" /></label>
+              <label class="field-stack"><span>National ID</span><input class="text-input" name="national_id" value="${escapeHtml(tenant.national_id || '')}" /></label>
+              <label class="field-stack"><span>Tenant ID</span><input class="text-input" name="tenant_id" value="${escapeHtml(tenant.tenant_id || '')}" disabled /></label>
             </div>
-            <div>
-              <form id="tenantDetailForm" data-tenant-id="${escapeHtml(tenant.tenant_id || '')}">
-                <div class="tenant-editor-grid">
-                  <label class="field-stack"><span>First name</span><input class="text-input" data-tenant-edit-field="first_name" type="text" value="${escapeHtml(tenant.first_name || '')}" /></label>
-                  <label class="field-stack"><span>Last name</span><input class="text-input" data-tenant-edit-field="last_name" type="text" value="${escapeHtml(tenant.last_name || '')}" /></label>
-                  <label class="field-stack"><span>Floor</span><input class="text-input" data-tenant-edit-field="floor_number" type="text" value="${escapeHtml(tenant.floor_number || '')}" /></label>
-                  <label class="field-stack"><span>Unit number</span><input class="text-input" data-tenant-edit-field="house_number" type="text" value="${escapeHtml(tenant.house_number || '')}" /></label>
-                  <label class="field-stack"><span>Phone number</span><input class="text-input" data-tenant-edit-field="phone_number" type="text" value="${escapeHtml(tenant.phone_number || '')}" /></label>
-                  <label class="field-stack"><span>Email</span><input class="text-input" data-tenant-edit-field="email_address" type="email" value="${escapeHtml(tenant.email_address || '')}" /></label>
-                  <label class="field-stack"><span>National ID</span><input class="text-input" data-tenant-edit-field="national_id" type="text" value="${escapeHtml(tenant.national_id || '')}" /></label>
-                  <label class="field-stack"><span>Rent</span><input class="money-input" data-tenant-edit-field="rent" type="number" min="0" step="0.01" value="${escapeHtml(tenant.rent || 0)}" /></label>
-                  <label class="field-stack"><span>Deposit</span><input class="money-input" data-tenant-edit-field="deposit" type="number" min="0" step="0.01" value="${escapeHtml(tenant.deposit || 0)}" /></label>
-                </div>
-              </form>
-              <div class="drawer-actions">
-                <button id="saveTenantDetailBtn" class="secondary-btn" type="button">Save tenant</button>
-              </div>
+            <div class="drawer-actions">
+              <button type="button" class="secondary-btn js-save-tenant" data-tenant-id="${tenant.id}" data-tenant-tenant-id="${escapeHtml(tenant.tenant_id || tenant.id)}">Save changes</button>
+              <button type="button" class="close-btn" data-action="close-tenant">Cancel</button>
             </div>
-          </div>
+          </form>
         `;
-      }
-
-      async function openTenantDrawer(tenantId) {
-        if (!tenantId) return;
-        showLoading(true);
-        try {
-          state.activeTenantDetail = await api(`/api/admin/tenants/${encodeURIComponent(tenantId)}/details`);
-          renderTenantDrawer();
-          drawerBackdrop.classList.add('visible');
-          drawer.classList.add('open');
-        } catch (error) {
-          setStatus(error.message || 'Unable to load tenant details.', true);
-        } finally {
-          showLoading(false);
-        }
+        drawer.classList.add('open');
+        drawerBackdrop.classList.add('visible');
       }
 
       function closeTenantDrawer() {
-        state.activeTenantDetail = null;
         drawer.classList.remove('open');
         drawerBackdrop.classList.remove('visible');
-      }
-
-      function renderAlerts() {
-        const threadPicker = document.getElementById('alertsThreadPicker');
-        const threadSelect = document.getElementById('alertsThreadSelect');
-        const history = document.getElementById('alertsHistory');
-        const context = document.getElementById('alertsContext');
-        const currentThread = (state.alerts.threads || []).find((thread) => Number(thread.thread_owner_admin_user_id) === Number(state.alerts.current_thread_owner_admin_user_id)) || null;
-        const isSuperAdmin = state.session?.role === 'SUPER_ADMIN';
-
-        threadPicker.hidden = !isSuperAdmin;
-        if (isSuperAdmin) {
-          threadSelect.innerHTML = (state.alerts.threads || []).map((thread) => `<option value="${thread.thread_owner_admin_user_id}">${escapeHtml(thread.owner_full_name || thread.owner_username || 'Property Admin')} • ${escapeHtml(thread.property_name || 'OTIC')}</option>`).join('');
-          threadSelect.value = state.alerts.current_thread_owner_admin_user_id || '';
-        }
-
-        if (currentThread) {
-          context.textContent = isSuperAdmin
-            ? `You are viewing the private thread for ${currentThread.owner_full_name || currentThread.owner_username} (${currentThread.property_name || 'OTIC'}).`
-            : 'Only you and the superadmin can view this thread.';
-        } else {
-          context.textContent = isSuperAdmin ? 'Select a property-admin thread to view or reply.' : 'Only you and the superadmin can view this thread.';
-        }
-
-        history.innerHTML = (state.alerts.messages || []).length
-          ? state.alerts.messages.map((message) => {
-              const isSelf = Number(message.sender_admin_user_id || 0) === Number(state.session?.admin_user_id || 0);
-              return `
-                <article class="alert-bubble ${isSelf ? 'is-self' : ''}">
-                  <div class="alert-meta">
-                    <strong>${escapeHtml(message.sender_name || message.sender_full_name || 'Admin')}</strong>
-                    <span>${escapeHtml(formatDateTime(message.created_at))}</span>
-                  </div>
-                  <div class="alert-body">${escapeHtml(message.body || '')}</div>
-                </article>
-              `;
-            }).join('')
-          : '<div class="empty-state">No alerts in this thread yet.</div>';
-
-        document.getElementById('sendAlertBtn').disabled = isSuperAdmin && !currentThread;
-      }
-
-      async function refreshAlerts(preferredThreadOwnerAdminUserId = state.alerts.current_thread_owner_admin_user_id) {
-        const query = new URLSearchParams();
-        if (preferredThreadOwnerAdminUserId) {
-          query.set('thread_owner_admin_user_id', preferredThreadOwnerAdminUserId);
-        }
-        const payload = await api(`/api/admin/alerts${query.toString() ? `?${query.toString()}` : ''}`);
-        state.alerts = {
-          ...payload,
-          loaded: true,
-        };
-        renderAlerts();
-      }
-
-      async function ensureAlertsLoaded(force = false) {
-        if (force || !state.alerts.loaded) {
-          await refreshAlerts();
-          return;
-        }
-        renderAlerts();
       }
 
       function renderDocuments() {
@@ -1235,16 +1085,70 @@
         renderReports();
       }
 
+      function renderAlerts() {
+        const threads = Array.isArray(state.alerts?.threads) ? state.alerts.threads : [];
+        const messages = Array.isArray(state.alerts?.messages) ? state.alerts.messages : [];
+        const threadOwnerSelect = document.getElementById('alertThreadOwnerSelect');
+        const threadOwnerGroup = document.getElementById('alertThreadOwnerGroup');
+
+        if (state.session?.role === 'SUPER_ADMIN') {
+          threadOwnerGroup.classList.remove('is-hidden');
+          if (threads.length) {
+            threadOwnerSelect.innerHTML = threads.map((thread) => `<option value="${escapeHtml(String(thread.thread_owner_admin_user_id))}">${escapeHtml(thread.owner_name || `Admin ${thread.thread_owner_admin_user_id}`)}</option>`).join('');
+          } else {
+            threadOwnerSelect.innerHTML = '<option value="">No threads yet</option>';
+          }
+        } else {
+          threadOwnerGroup.classList.add('is-hidden');
+        }
+
+        document.getElementById('alertsBadge').textContent = `${threads.length || 0} thread${threads.length === 1 ? '' : 's'}`;
+
+        if (!threads.length && !messages.length) {
+          document.getElementById('alertThreadList').innerHTML = '<div class="empty-state">No admin alerts yet.</div>';
+          return;
+        }
+
+        const orderedThreads = [...threads].sort((left, right) => Number(right.message_count || 0) - Number(left.message_count || 0));
+        document.getElementById('alertThreadList').innerHTML = orderedThreads.map((thread) => {
+          const threadMessages = messages.filter((message) => String(message.thread_owner_admin_user_id) === String(thread.thread_owner_admin_user_id));
+          const recentMessages = threadMessages.slice(-4).map((message) => `
+            <div class="alert-message ${message.sender_admin_user_id === state.session?.user_id ? 'mine' : ''}">
+              <strong>${escapeHtml(message.sender_name || 'Admin')}</strong>
+              <small>${escapeHtml(formatDate(message.created_at))}</small>
+              <p>${escapeHtml(message.body || '')}</p>
+            </div>
+          `).join('');
+
+          return `
+            <div class="alert-thread">
+              <div class="panel-header">
+                <h3>${escapeHtml(thread.owner_name || `Admin ${thread.thread_owner_admin_user_id}`)}</h3>
+                <span class="pill info">${Number(thread.message_count || 0)} messages</span>
+              </div>
+              <div class="alert-thread-body">${recentMessages || '<div class="empty-state">No messages in this thread yet.</div>'}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      async function refreshAlerts() {
+        state.alerts = await api('/api/admin/alerts');
+        renderAlerts();
+      }
+
       async function loadDashboard() {
         showLoading(true);
         try {
           state.session = await api('/api/admin/session');
           renderPropertySelector();
-          adminUserEl.textContent = state.session?.full_name || roleName();
+          adminUserEl.textContent = roleName();
           state.bootstrap = await api('/api/admin/bootstrap');
-          state.alerts = { threads: [], messages: [], current_thread_owner_admin_user_id: null, loaded: false };
           state.overviewMonthKey = state.ledger.month_key;
-          await Promise.all([refreshOverviewMonthlySummary(), refreshReports(), refreshLedger()]);
+          await refreshOverviewMonthlySummary();
+          await refreshReports();
+          await refreshAlerts();
+          await refreshLedger();
           renderOverviewMonthControls();
           renderTenantFloorOptions();
           renderOverview();
@@ -1252,7 +1156,7 @@
           renderDocuments();
           renderReports();
           renderNav();
-          await setPage(state.activePage);
+          setPage(state.activePage);
           setStatus(`${propertyName()} data loaded.`);
         } catch (error) {
           setStatus(error.message || 'Unable to load the admin console.', true);
@@ -1262,9 +1166,7 @@
       }
 
       document.querySelectorAll('.nav-btn').forEach((button) => {
-        button.addEventListener('click', async () => {
-          await setPage(button.dataset.target);
-        });
+        button.addEventListener('click', () => setPage(button.dataset.target));
       });
 
       tenantSearch.addEventListener('input', () => {
@@ -1349,6 +1251,33 @@
         }
       });
 
+      document.getElementById('sendAlertBtn').addEventListener('click', async () => {
+        const text = document.getElementById('alertMessageInput').value.trim();
+        if (!text) {
+          setStatus('Enter a message before sending an alert.', true);
+          return;
+        }
+
+        const payload = { body: text };
+        if (state.session?.role === 'SUPER_ADMIN') {
+          const threadOwnerId = document.getElementById('alertThreadOwnerSelect').value;
+          if (!threadOwnerId) {
+            setStatus('Select an admin thread to reply to.', true);
+            return;
+          }
+          payload.thread_owner_admin_user_id = Number(threadOwnerId);
+        }
+
+        try {
+          await api('/api/admin/alerts', { method: 'POST', body: payload });
+          document.getElementById('alertMessageInput').value = '';
+          await refreshAlerts();
+          setStatus('Alert sent.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to send the alert.', true);
+        }
+      });
+
       document.getElementById('uploadDocumentBtn').addEventListener('click', async () => {
         const fileInput = document.getElementById('docFile');
         const file = fileInput.files?.[0];
@@ -1385,32 +1314,6 @@
 
       document.getElementById('closeDrawerBtn').addEventListener('click', closeTenantDrawer);
       drawerBackdrop.addEventListener('click', closeTenantDrawer);
-      document.getElementById('alertsThreadSelect').addEventListener('change', async (event) => {
-        await refreshAlerts(event.target.value);
-      });
-
-      document.getElementById('sendAlertBtn').addEventListener('click', async () => {
-        const messageInput = document.getElementById('alertMessageInput');
-        const body = messageInput.value.trim();
-        if (!body) {
-          setStatus('Type an alert message before sending.', true);
-          return;
-        }
-
-        try {
-          const payload = { body };
-          if (state.session?.role === 'SUPER_ADMIN' && state.alerts.current_thread_owner_admin_user_id) {
-            payload.thread_owner_admin_user_id = state.alerts.current_thread_owner_admin_user_id;
-          }
-          const response = await api('/api/admin/alerts', { method: 'POST', body: payload });
-          state.alerts = { ...response, loaded: true };
-          renderAlerts();
-          messageInput.value = '';
-          setStatus('Alert sent.');
-        } catch (error) {
-          setStatus(error.message || 'Unable to send the alert.', true);
-        }
-      });
 
       document.getElementById('logoutBtn').addEventListener('click', async () => {
         try { await api('/api/admin/logout', { method: 'POST' }); } catch (_) {}
@@ -1420,38 +1323,7 @@
       document.body.addEventListener('click', async (event) => {
         const tenantRow = event.target.closest('.tenant-row');
         if (tenantRow) {
-          await openTenantDrawer(tenantRow.dataset.tenantId);
-          return;
-        }
-
-        const saveTenantDetailButton = event.target.closest('#saveTenantDetailBtn');
-        if (saveTenantDetailButton) {
-          const form = document.getElementById('tenantDetailForm');
-          if (!form) {
-            setStatus('Tenant detail form is unavailable.', true);
-            return;
-          }
-
-          const tenantId = form.dataset.tenantId;
-          const payload = Object.fromEntries(
-            Array.from(form.querySelectorAll('[data-tenant-edit-field]')).map((input) => [input.dataset.tenantEditField, input.value])
-          );
-
-          try {
-            const response = await api(`/api/admin/users/${encodeURIComponent(tenantId)}`, {
-              method: 'PATCH',
-              body: payload,
-            });
-            updateTenantInState(response.user);
-            renderTenantFloorOptions();
-            renderTenantTable();
-            state.activeTenantDetail = await api(`/api/admin/tenants/${encodeURIComponent(tenantId)}/details`);
-            renderTenantDrawer();
-            await Promise.all([refreshReports(), refreshLedger()]);
-            setStatus('Tenant details saved.');
-          } catch (error) {
-            setStatus(error.message || 'Unable to save tenant details.', true);
-          }
+          openTenantDrawer(tenantRow.dataset.tenantId);
           return;
         }
 
@@ -1459,6 +1331,39 @@
         if (previewButton) {
           const doc = currentDocuments().find((item) => String(item.id) === String(previewButton.dataset.docId));
           renderPreview(doc);
+          return;
+        }
+
+        const closeTenantAction = event.target.closest('[data-action="close-tenant"]');
+        if (closeTenantAction) {
+          closeTenantDrawer();
+          return;
+        }
+
+        const saveTenantButton = event.target.closest('.js-save-tenant');
+        if (saveTenantButton) {
+          const form = saveTenantButton.closest('.tenant-edit-form');
+          const tenantKey = saveTenantButton.dataset.tenantTenantId || saveTenantButton.dataset.tenantId;
+          const payload = {
+            first_name: form.querySelector('[name="first_name"]').value.trim(),
+            last_name: form.querySelector('[name="last_name"]').value.trim(),
+            phone_number: form.querySelector('[name="phone_number"]').value.trim(),
+            email_address: form.querySelector('[name="email_address"]').value.trim(),
+            floor_number: form.querySelector('[name="floor_number"]').value.trim(),
+            house_number: form.querySelector('[name="house_number"]').value.trim(),
+            national_id: form.querySelector('[name="national_id"]').value.trim(),
+            rent: form.querySelector('[name="rent"]').value,
+            deposit: form.querySelector('[name="deposit"]').value,
+          };
+
+          try {
+            await api(`/api/admin/users/${encodeURIComponent(tenantKey)}`, { method: 'PATCH', body: payload });
+            await loadDashboard();
+            closeTenantDrawer();
+            setStatus('Tenant details updated.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to save tenant details.', true);
+          }
           return;
         }
 

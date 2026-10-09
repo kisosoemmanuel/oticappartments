@@ -81,10 +81,11 @@ import {
   updateVacateNoticeStatus,
   verifyPassword,
   addTransaction,
-} from "./db.js";
+} from "./src/db.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const FRONTEND_DIR = path.join(__dirname, "frontend");
 
 const app = express();
 app.disable("x-powered-by");
@@ -2450,12 +2451,12 @@ app.get("/", (req, res) => {
 
 app.get("/secure-admin", (req, res) => {
   setNoStore(res);
-  res.sendFile(path.join(__dirname, "admin.html"));
+  res.sendFile(path.join(FRONTEND_DIR, "admin.html"));
 });
 
 app.get("/secure-admin/login", (req, res) => {
   setNoStore(res);
-  res.sendFile(path.join(__dirname, "admin-login.html"));
+  res.sendFile(path.join(FRONTEND_DIR, "admin-login.html"));
 });
 
 app.get("/admin", (req, res) => {
@@ -2470,14 +2471,14 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/404", (req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "404.html"));
+  res.status(404).sendFile(path.join(FRONTEND_DIR, "404.html"));
 });
 
 app.get("/500", (req, res) => {
-  res.status(500).sendFile(path.join(__dirname, "500.html"));
+  res.status(500).sendFile(path.join(FRONTEND_DIR, "500.html"));
 });
 
-app.use(express.static(__dirname));
+app.use(express.static(FRONTEND_DIR));
 
 app.use((error, req, res, next) => {
   if (res.headersSent) {
@@ -2491,7 +2492,7 @@ app.use((error, req, res, next) => {
     return;
   }
 
-  res.status(500).sendFile(path.join(__dirname, "500.html"));
+  res.status(500).sendFile(path.join(FRONTEND_DIR, "500.html"));
 });
 
 app.use("/api", (req, res) => {
@@ -2499,7 +2500,7 @@ app.use("/api", (req, res) => {
 });
 
 app.get("*", (req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "404.html"));
+  res.status(404).sendFile(path.join(FRONTEND_DIR, "404.html"));
 });
 
 function checkPortAvailable(port) {

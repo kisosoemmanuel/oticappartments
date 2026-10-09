@@ -15,7 +15,7 @@ if (!databaseUrl) {
   throw new Error("Set DATABASE_URL before running the SQLite to Postgres migration.");
 }
 
-const { default: pool, initDb } = await import("../db-postgres.js");
+const { default: pool, initDb } = await import("../src/db-postgres.js");
 await initDb();
 
 const sqlite = new Database(sourceDbPath, { readonly: true });

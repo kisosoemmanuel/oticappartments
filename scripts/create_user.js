@@ -1,4 +1,4 @@
-import { createUser, listUsers } from "../db.js";
+import { createUser, listUsers } from "../src/db.js";
 
 function usage() {
   console.log(`Usage: node scripts/create_user.js --firstName <first> --lastName <last> --password <pwd> [--rent <rent>] [--balance <balance>] [--arrears <arrears>]`);

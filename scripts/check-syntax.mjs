@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const filesToCheck = [
-  "db.js",
-  "db-postgres.js",
-  "db-sqlite.js",
+  "src/db.js",
+  "src/db-postgres.js",
+  "src/db-sqlite.js",
   "server.js",
   "scripts/migrate-sqlite-to-postgres.mjs",
   "static/app.js",
@@ -19,10 +19,10 @@ for (const file of filesToCheck) {
   }
 }
 
-const adminHtml = readFileSync("admin.html", "utf8");
+const adminHtml = readFileSync("frontend/admin.html", "utf8");
 const inlineScript = adminHtml.match(/<script>([\s\S]*)<\/script>\s*<\/body>/i)?.[1];
 if (!inlineScript) {
-  throw new Error("Inline admin script not found in admin.html");
+  throw new Error("Inline admin script not found in frontend/admin.html");
 }
 
 new Function(inlineScript);

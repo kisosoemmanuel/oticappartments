@@ -139,7 +139,7 @@ async function main() {
   try {
     log(`Using ${baseUrl}`);
 
-    const adminHtml = readFileSync("admin.html", "utf8");
+    const adminHtml = readFileSync("frontend/admin.html", "utf8");
     assert(adminHtml.includes("OTIC Admin Console"), "OTIC admin console title should be present");
     assert(adminHtml.includes("Tenant directory"), "Tenant directory section should be present");
     assert(adminHtml.includes("Admin alerts"), "Admin alerts section should be present");

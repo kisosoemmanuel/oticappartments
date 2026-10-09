@@ -1,1513 +1,1718 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Admin - Otic Apartments</title>
-<style>
-:root{--bg:#f3f6fb;--panel:#ffffff;--panel-soft:#eef4ff;--text:#16324f;--muted:#5f7388;--border:#d9e4f2;--accent:#1d4ed8;--accent-strong:#1e40af;--success:#0f766e;--success-soft:#e8fbf5;--warning:#b45309;--warning-soft:#fff5e6;--danger:#b91c1c;--danger-soft:#fff1f2;--shadow:0 20px 50px rgba(22,50,79,.12)}
-*{box-sizing:border-box}
-body{margin:0;font-family:Georgia,"Segoe UI",serif;background:radial-gradient(circle at top left,rgba(29,78,216,.10),transparent 35%),linear-gradient(180deg,#f9fbff 0%,var(--bg) 100%);color:var(--text)}
-button,input,select,textarea{font:inherit}
-.app{display:grid;grid-template-columns:268px 1fr;min-height:100vh}
-.sidebar{background:#13263d;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:24px;overflow:auto}
-.brand{width:fit-content;padding:14px 18px;border-radius:20px;background:rgba(255,255,255,.96);border:1px solid rgba(255,255,255,.2)}
-.brand img{width:170px;max-width:100%;display:block}
-#identity{color:rgba(255,255,255,.8);line-height:1.5}
-.topbar-actions{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
-.topbar-actions .property-control{min-width:220px}
-.nav{display:grid;gap:10px}
-.nav button,.btn{border:0;border-radius:14px;padding:12px 16px;cursor:pointer}
-.nav button{background:transparent;color:rgba(255,255,255,.82);text-align:left}
-.nav button.active,.nav button:hover{background:rgba(255,255,255,.12);color:#fff}
-.main{padding:28px}
-.topbar{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:24px}
-.topbar h1{margin:8px 0 0;font-size:40px;line-height:1}
-.page-copy{margin:10px 0 0;color:var(--muted);max-width:720px}
-.btn{background:var(--accent);color:#fff;transition:transform .12s ease,background .12s ease}
-.btn:hover{background:var(--accent-strong);transform:translateY(-1px)}
-.btn.secondary{background:#e7eefb;color:var(--text)}
-.btn.secondary:hover{background:#d8e4fb}
-.btn.success{background:var(--success)}
-.btn.success:hover{background:#0d5f59}
-.btn.warning{background:#fbbf24;color:#3f2a00}
-.btn.warning:hover{background:#f59e0b}
-.btn.danger{background:#dc2626}
-.btn.danger:hover{background:#b91c1c}
-.status{min-height:24px;margin-bottom:14px;color:var(--muted);font-size:14px}
-.status.error{color:var(--danger)}
-.status.success{color:var(--success)}
-.hidden{display:none}
-.grid{display:grid;gap:18px}
-.stats{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.three{display:grid;grid-template-columns:1.15fr .85fr .95fr;gap:18px}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:22px;box-shadow:var(--shadow)}
-.title{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
-.value{font-size:32px;line-height:1.1}
-.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
-label{display:block;margin-bottom:6px;color:var(--muted);font-size:14px}
-input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:#fff;color:var(--text)}
-input:focus,select:focus,textarea:focus{outline:2px solid rgba(29,78,216,.18);border-color:var(--accent)}
-textarea{min-height:120px;resize:vertical}
-.list,.stack{display:grid;gap:14px}
-.item{background:#f8fbff;border:1px solid #e3edf8;border-radius:18px;padding:16px}
-.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.muted{color:var(--muted)}
-.pill{display:inline-flex;width:fit-content;padding:7px 12px;border-radius:999px;background:var(--panel-soft);color:#163ea8;font-size:12px;letter-spacing:.03em}
-.pill.status-pending,.pill.status-pending-confirmation{background:var(--warning-soft);color:var(--warning)}
-.pill.status-in-progress{background:#fff3cd;color:#9a6700}
-.pill.status-resolved,.pill.status-solved,.pill.status-approved,.pill.status-completed{background:var(--success-soft);color:var(--success)}
-.pill.status-disapproved{background:var(--danger-soft);color:var(--danger)}
-.pill.status-online{background:var(--success-soft);color:var(--success)}
-.pill.status-recently-active{background:var(--warning-soft);color:var(--warning)}
-.pill.status-offline,.pill.status-never-seen{background:#eef2f7;color:#546273}
-.selection-summary{margin:0;color:var(--muted);font-size:13px}
-.selection-list{max-height:290px;overflow:auto;padding-right:4px}
-.check-item{display:flex;gap:12px;align-items:flex-start}
-.check-item input[type="checkbox"]{width:18px;height:18px;margin:2px 0 0}
-.tenant-detail-shell{display:grid;gap:18px}
-.detail-hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.detail-section .item{background:#fff}
-.record-list{display:grid;gap:12px}
-.section-heading{margin:0 0 14px;font-size:18px}
-.item.ticket-pending{border-color:#f4c985;background:#fffbf2}
-.item.ticket-in-progress{border-color:#f7d774;background:#fff8dd}
-.item.ticket-resolved,.item.ticket-solved{border-color:#9fddc4;background:#f2fcf7}
-.item.payment-pending-confirmation{border-color:#f1c987;background:#fffbf3}
-.item.payment-approved{border-color:#9fddc4;background:#f2fcf7}
-.item.payment-disapproved{border-color:#f2a8b5;background:#fff5f7}
-#overviewStats .panel{background:linear-gradient(180deg,var(--panel-soft),#fff)}
-@media (max-width:1100px){.app,.three,.split,.detail-grid{grid-template-columns:1fr}.main{padding:18px}}
-</style>
-</head>
-<body>
-<div class="app">
-<aside class="sidebar">
-<div class="brand"><img src="/brand.png" alt="Otic Apartments" /></div>
-<div id="identity">Checking session...</div>
-<nav class="nav">
-<button class="active" data-tab="overview">Overview</button>
-<button data-tab="tenants">Tenants</button>
-<button data-tab="documents">Documents</button>
-<button data-tab="messages">Messages</button>
-<button data-tab="notices">Vacating Notices</button>
-<button data-tab="tickets">Tickets</button>
-<button data-tab="payments">Payments</button>
-</nav>
-<button class="btn danger" id="logoutBtn" type="button">Log out</button>
-</aside>
-<main class="main">
-<div class="topbar"><div><div class="pill">Private Admin</div><h1>Admin Console</h1><p id="topbarCopy" class="page-copy">Manage tenants, messages, notices, tickets, payments, and occupancy from one private workspace.</p></div><div class="topbar-actions"><div class="property-control"><label for="propertySelect">Property</label><select id="propertySelect"></select></div><div id="propertyBadge" class="pill">Loading property...</div><button class="btn secondary" id="refreshAllBtn" type="button">Refresh</button></div></div>
-<div id="status" class="status"></div>
-<section id="tab-overview" class="grid">
-<div class="grid stats" id="overviewStats"></div>
-<div class="split"><section class="panel"><h2 class="title">Action Queue</h2><div id="actionQueue" class="list"></div></section><section class="panel"><h2 class="title">Occupancy Control</h2><form id="occupancyForm" class="stack"><div class="filters"><div><label for="occupiedUnitsInput">Occupied Units</label><input id="occupiedUnitsInput" type="number" min="0" step="1" /></div><div><label for="vacantUnitsInput">Vacant Units</label><input id="vacantUnitsInput" type="number" min="0" step="1" /></div></div><button class="btn" type="submit">Save Occupancy</button></form></section></div>
-</section>
-<section id="tab-tenants" class="hidden"><div id="tenantListView" class="three"><section class="panel"><h2 class="title">Tenant Filters</h2><div class="filters"><div><label for="tenantFloorFilter">Floor</label><select id="tenantFloorFilter"></select></div><div><label for="tenantSearch">Search</label><input id="tenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div id="tenantCards" class="list"></div></section><section class="panel"><h2 class="title">Quick Preview</h2><div id="tenantPreview" class="list"><div class="item">Choose a tenant to preview their record.</div></div></section><section class="panel"><h2 class="title">Create Tenant</h2><form id="createUserForm" class="stack"><div class="filters"><div><label for="firstName">First name</label><input id="firstName" required /></div><div><label for="lastName">Last name</label><input id="lastName" /></div><div><label for="accountNumber">Account number</label><input id="accountNumber" required /></div><div><label for="floorNumber">Floor number</label><input id="floorNumber" /></div><div><label for="houseNumber">Unit / house number</label><input id="houseNumber" /></div><div><label for="phoneNumber">Phone</label><input id="phoneNumber" /></div><div><label for="rent">Rent</label><input id="rent" type="number" min="0" step="0.01" /></div><div><label for="waterBill">Water Bill</label><input id="waterBill" type="number" min="0" step="0.01" /></div><div><label for="trashBill">Trash Bill</label><input id="trashBill" type="number" min="0" step="0.01" /></div><div><label for="electricityBill">Electricity Bill</label><input id="electricityBill" type="number" min="0" step="0.01" /></div><div><label for="deposit">Deposit</label><input id="deposit" type="number" min="0" step="0.01" /></div></div><div id="createTenantPropertyHint" class="muted">New tenants created here will be assigned to the selected property.</div><div class="muted">Account balance is calculated automatically from the payable amounts you enter.</div><button class="btn" type="submit">Create user</button></form><div class="item" style="margin-top:14px;"><strong>Bulk Balance Actions</strong><div class="muted" style="margin-top:6px;">Use these for every tenant in the current property without opening records one by one.</div><div class="toolbar" style="margin-top:12px;"><button class="btn warning" id="resetAllBalancesBtn" type="button">Reset All Balances</button><button class="btn secondary" id="setAllRentDueBtn" type="button">Set All Rent Due</button></div></div></section></div></section>
-<section id="tab-tenant-detail" class="hidden"><div class="toolbar" style="justify-content:space-between;margin-bottom:14px;"><button class="btn secondary" id="backToTenantsBtn" type="button">Back to Tenants</button><span class="pill">Tenant Record</span></div><div id="tenantDetail"></div></section>
-<section id="tab-documents" class="hidden"><div class="split"><section class="panel"><h2 class="title">Upload Shared Document</h2><form id="sharedDocumentForm" class="stack"><div class="filters"><div><label for="sharedDocumentName">Document name</label><input id="sharedDocumentName" placeholder="e.g. House Rules" /></div><div><label for="sharedDocumentCategory">Category</label><input id="sharedDocumentCategory" value="General" /></div></div><div><label for="sharedDocumentStatus">Status</label><select id="sharedDocumentStatus"><option value="AVAILABLE">Available</option><option value="REQUIRED">Required</option><option value="IMPORTANT">Important</option></select></div><div><label for="sharedDocumentFile">File</label><input id="sharedDocumentFile" type="file" /></div><button class="btn" type="submit">Upload For All Tenants</button></form></section><section class="panel"><div class="toolbar" style="justify-content:space-between;"><h2 class="title" style="margin:0;">Published Documents</h2><span id="documentScopePill" class="pill">Visible To Current Property</span></div><div id="documentList" class="list" style="margin-top:14px;"></div></section></div></section>
-<section id="tab-messages" class="hidden"><div class="split"><section class="panel"><h2 class="title">All Messages</h2><div class="filters"><div><label for="messageSenderFilter">Sender type</label><select id="messageSenderFilter"><option value="">All senders</option><option value="TENANT">Tenant</option><option value="ADMIN">Admin</option><option value="SYSTEM">System</option></select></div><div><label for="messageSearch">Search</label><input id="messageSearch" placeholder="Tenant, subject, category, body" /></div></div><div id="messageList" class="list"></div></section><section class="panel"><h2 class="title">Send Message</h2><form id="sendMessageForm" class="stack"><div><label for="messageTenant">Tenant</label><select id="messageTenant"></select></div><div class="filters"><div><label for="messageSender">Sender name</label><input id="messageSender" value="Davies Muchai" /></div><div><label for="messageCategory">Category</label><input id="messageCategory" value="Billing" /></div></div><div><label for="messageSubject">Subject</label><input id="messageSubject" /></div><div><label for="messageBody">Message body</label><textarea id="messageBody"></textarea></div><button class="btn" type="submit">Send message</button></form><div class="toolbar" style="margin-top:14px;"><button class="btn secondary" id="loadMessagesBtn" type="button">Load conversation</button></div><div id="messageThread" class="list" style="margin-top:14px;"></div></section></div></section>
-<section id="tab-notices" class="hidden"><section class="panel"><h2 class="title">Vacating Notices</h2><div class="filters"><div><label for="noticeSearch">Search</label><input id="noticeSearch" placeholder="Tenant, unit, property" /></div><div><label for="noticeStatusFilter">Status</label><select id="noticeStatusFilter"><option value="">All statuses</option><option value="Pending">Pending</option><option value="APPROVED">Approved</option><option value="DISAPPROVED">Disapproved</option></select></div></div><div id="noticeList" class="list"></div></section></section>
-<section id="tab-tickets" class="hidden"><section class="panel"><h2 class="title">Tickets</h2><div class="filters"><div><label for="ticketSearch">Search</label><input id="ticketSearch" placeholder="Tenant, title, status" /></div><div><label for="ticketStatusFilter">Status</label><select id="ticketStatusFilter"><option value="">All open tickets</option><option value="Pending">Pending</option><option value="In Progress">In Progress</option></select></div></div><div id="ticketList" class="list"></div></section></section>
-<section id="tab-payments" class="hidden"><div class="split"><section class="panel"><h2 class="title">Payment Controls</h2><div class="grid stats" id="paymentStats"></div><form id="paymentTargetsForm" class="stack" style="margin-top:14px;"><div class="filters"><div><label for="expectedCollection">Expected amount required</label><input id="expectedCollection" type="number" min="0" step="0.01" /></div><div><label for="acquiredCollection">Acquired amount from all tenants</label><input id="acquiredCollection" type="number" min="0" step="0.01" /></div></div><button class="btn" type="submit">Save totals</button></form><form id="billingConfigForm" class="stack" style="margin-top:14px;"><div class="filters"><div><label for="billingRent">Rent</label><input id="billingRent" type="number" min="0" step="0.01" /></div><div><label for="billingWater">Water Bill</label><input id="billingWater" type="number" min="0" step="0.01" /></div><div><label for="billingTrash">Trash Bill</label><input id="billingTrash" type="number" min="0" step="0.01" /></div><div><label for="billingElectricity">Electricity Bill</label><input id="billingElectricity" type="number" min="0" step="0.01" /></div></div><div><div class="toolbar" style="justify-content:space-between;margin-bottom:10px;"><h3 class="section-heading" style="margin:0;font-size:16px;">Apply Bills To</h3><p id="billingSelectionSummary" class="selection-summary"></p></div><div class="filters"><div><label for="billingTenantSearch">Search tenants</label><input id="billingTenantSearch" placeholder="Name, tenant ID, unit" /></div></div><div class="toolbar" style="margin-bottom:10px;"><button class="btn secondary" id="selectAllBillingTenantsBtn" type="button">Select All</button><button class="btn secondary" id="clearBillingTenantsBtn" type="button">Clear</button></div><div id="billingTenantSelection" class="list selection-list"></div></div><button class="btn secondary" type="submit">Apply bill values to selected tenants</button></form></section><section class="panel"><h2 class="title">Payment Feed</h2><div class="filters"><div><label for="paymentStatusFilter">Status</label><select id="paymentStatusFilter"><option value="">All statuses</option><option value="PENDING_CONFIRMATION">Pending confirmation</option><option value="APPROVED">Approved</option><option value="DISAPPROVED">Disapproved</option><option value="COMPLETED">Completed</option></select></div><div><label for="paymentSearch">Search</label><input id="paymentSearch" placeholder="Tenant, unit, confirmation code, phone" /></div></div><div id="paymentList" class="list"></div></section></div></section>
-</main>
-</div>
-<script>
-const state = {
-  username: "",
-  overview: null,
-  meta: {},
-  properties: [],
-  selectedProperty: null,
-  users: [],
-  messages: [],
-  notices: [],
-  tickets: [],
-  payments: { summary: {}, billing: {}, payments: [] },
-  documents: [],
-  tenantDetail: null,
-  billingSelection: [],
-  billingSelectionInitialized: false,
-};
-
-const statusEl = document.getElementById("status");
-const identityEl = document.getElementById("identity");
-const AUTO_REFRESH_INTERVAL_MS = 10000;
-const ADMIN_SESSION_STORAGE_KEY = "oticAdminSessionToken";
-let adminAutoRefreshTimer = null;
-let loadAllDataPromise = null;
-let loadAllDataRequestId = 0;
-
-const esc = (value) =>
-  String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-const money = (value) =>
-  `KES ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-function currentPropertyName() {
-  return state.selectedProperty?.name || "the selected property";
-}
-
-function setStatus(text, isError) {
-  statusEl.textContent = text;
-  statusEl.className = `status ${isError ? "error" : "success"}`;
-}
-
-function getAdminSessionToken() {
-  return localStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || "";
-}
-
-function clearAdminSessionToken() {
-  localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
-}
-
-function humanizeStatus(value) {
-  return String(value || "")
-    .replaceAll("_", " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function ticketStatusValue(status) {
-  const normalized = String(status || "").trim();
-  return normalized === "Resolved" ? "Solved" : normalized || "Pending";
-}
-
-function isTicketOpen(status) {
-  return !["Resolved", "Solved"].includes(String(status || "").trim());
-}
-
-function paymentNeedsReview(payment) {
-  return String(payment?.status || "").trim().toUpperCase() === "PENDING_CONFIRMATION";
-}
-
-function noticeNeedsReview(notice) {
-  return String(notice?.status || "").trim() === "Pending";
-}
-
-function statusClass(value) {
-  return (
-    String(value || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-") || "default"
-  );
-}
-
-function formatDate(value) {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? String(value)
-    : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-function formatDateTime(value) {
-  if (!value) return "N/A";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? String(value)
-    : date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      });
-}
-
-function humanizeActivityStatus(value) {
-  const normalized = String(value || "").trim().toUpperCase();
-  if (normalized === "ONLINE") return "Online";
-  if (normalized === "RECENTLY_ACTIVE") return "Recently Active";
-  if (normalized === "OFFLINE") return "Offline";
-  return "Never Seen";
-}
-
-function formatRelativeTime(value) {
-  if (!value) return "Never";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown";
-
-  const diffMs = Math.max(Date.now() - date.getTime(), 0);
-  const diffMinutes = Math.floor(diffMs / 60000);
-  if (diffMinutes < 1) return "Just now";
-  if (diffMinutes < 60) return `${diffMinutes} min ago`;
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} hr${diffHours === 1 ? "" : "s"} ago`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-}
-
-function renderStatusPill(value, label = value) {
-  return `<span class="pill status-${statusClass(value)}">${esc(label)}</span>`;
-}
-
-function renderActivityPill(user) {
-  const status = user?.activity_status || "NEVER_SEEN";
-  return renderStatusPill(status, humanizeActivityStatus(status));
-}
-
-function renderRecordCollection(items, emptyMessage) {
-  if (!items.length) {
-    return `<div class="item">${esc(emptyMessage)}</div>`;
-  }
-  return `<div class="record-list">${items.join("")}</div>`;
-}
-
-function shouldPauseAutoRefresh() {
-  const active = document.activeElement;
-  if (!active) return false;
-  return ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName) && !active.readOnly && !active.disabled;
-}
-
-async function fetchJson(url, options = {}) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), Number(options.timeoutMs || 30000));
-  let response;
-  const headers = new Headers(options.headers || {});
-  const adminToken = getAdminSessionToken();
-  if (adminToken && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${adminToken}`);
-  }
-
-  try {
-    response = await fetch(url, { credentials: "same-origin", signal: controller.signal, ...options, headers });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error(`Request timed out for ${url}`);
-    }
-    throw error;
-  } finally {
-    window.clearTimeout(timeout);
-  }
-
-  if (response.status === 401) {
-    clearAdminSessionToken();
-    window.location.href = "/secure-admin/login";
-    throw new Error("Admin session expired");
-  }
-
-  const type = response.headers.get("content-type") || "";
-  if (!type.includes("application/json")) {
-    throw new Error(`Expected JSON from ${url}`);
-  }
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || `Request failed for ${url}`);
-  }
-
-  return data;
-}
-
-async function ensureSession() {
-  const data = await fetchJson("/api/admin/session");
-  state.username = data.username || "Admin";
-  state.properties = data.properties || [];
-  state.selectedProperty = data.selected_property || null;
-  renderPropertyContext();
-}
-
-function renderPropertyContext() {
-  const propertySelect = document.getElementById("propertySelect");
-  const propertyBadge = document.getElementById("propertyBadge");
-  const topbarCopy = document.getElementById("topbarCopy");
-  const createTenantPropertyHint = document.getElementById("createTenantPropertyHint");
-  const documentScopePill = document.getElementById("documentScopePill");
-  const currentPropertyId = state.selectedProperty?.id || "";
-
-  propertySelect.innerHTML = (state.properties || []).length
-    ? state.properties
-        .map((property) => `<option value="${esc(property.id)}">${esc(property.name || property.id)}</option>`)
-        .join("")
-    : '<option value="">No properties available</option>';
-  if (currentPropertyId) {
-    propertySelect.value = currentPropertyId;
-  }
-
-  const propertyName = currentPropertyName();
-  identityEl.textContent = state.selectedProperty
-    ? `Signed in as ${state.username || "Admin"} | ${propertyName}`
-    : `Signed in as ${state.username || "Admin"}`;
-  propertyBadge.textContent = state.selectedProperty ? `Viewing ${propertyName}` : "Select a property";
-  topbarCopy.textContent = state.selectedProperty
-    ? `Manage tenants, messages, notices, tickets, payments, and occupancy for ${propertyName} from one private workspace.`
-    : "Manage tenants, messages, notices, tickets, payments, and occupancy from one private workspace.";
-  createTenantPropertyHint.textContent = state.selectedProperty
-    ? `New tenants created here will be assigned to ${propertyName}.`
-    : "New tenants created here will be assigned to the selected property.";
-  documentScopePill.textContent = state.selectedProperty
-    ? `Visible To ${propertyName} Tenants`
-    : "Visible To Current Property";
-}
-
-async function switchProperty(propertyId) {
-  const nextPropertyId = String(propertyId || "").trim();
-  if (!nextPropertyId || nextPropertyId === (state.selectedProperty?.id || "")) {
-    renderPropertyContext();
-    return;
-  }
-
-  const payload = await fetchJson("/api/admin/context/property", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ property_id: nextPropertyId }),
-  });
-
-  if (payload.token) {
-    localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, payload.token);
-  }
-
-  state.properties = payload.properties || state.properties;
-  state.selectedProperty = payload.selected_property || state.selectedProperty;
-  state.billingSelection = [];
-  state.billingSelectionInitialized = false;
-  state.tenantDetail = null;
-  document.getElementById("tenantDetail").innerHTML = "";
-  document.getElementById("messageThread").innerHTML = "";
-  switchTab("overview");
-  renderPropertyContext();
-  await loadAllData({ force: true });
-  setStatus(`Now viewing ${currentPropertyName()}.`, false);
-}
-
-function switchTab(tab) {
-  const activeTab = tab === "tenant-detail" ? "tenants" : tab;
-  document.querySelectorAll(".nav button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.tab === activeTab);
-  });
-  document.querySelectorAll('[id^="tab-"]').forEach((section) => section.classList.add("hidden"));
-  const target = document.getElementById(`tab-${tab}`);
-  if (target) {
-    target.classList.remove("hidden");
-  }
-}
-
-function getVisibleTenantDetailId() {
-  const detailTab = document.getElementById("tab-tenant-detail");
-  if (!detailTab || detailTab.classList.contains("hidden")) return null;
-  return state.tenantDetail?.tenant?.tenant_id || null;
-}
-
-function syncBillingSelection() {
-  const available = new Set(state.users.map((user) => user.tenant_id).filter(Boolean));
-  if (!state.billingSelectionInitialized) {
-    state.billingSelection = state.users.map((user) => user.tenant_id).filter(Boolean);
-    state.billingSelectionInitialized = true;
-    return;
-  }
-
-  state.billingSelection = state.billingSelection.filter((tenantId) => available.has(tenantId));
-}
-
-function setBillingSelection(tenantIds) {
-  const available = new Set(state.users.map((user) => user.tenant_id).filter(Boolean));
-  state.billingSelection = [...new Set(tenantIds.filter((tenantId) => available.has(tenantId)))];
-  state.billingSelectionInitialized = true;
-  renderBillingTenantSelection();
-}
-
-function fillFloorSelect() {
-  const select = document.getElementById("tenantFloorFilter");
-  const current = select.value;
-  const floors = [...new Set(state.users.map((user) => user.floor_number).filter(Boolean))].sort();
-  select.innerHTML =
-    '<option value="">All floors</option>' +
-    floors.map((floor) => `<option value="${esc(floor)}">${esc(floor)}</option>`).join("");
-  if (floors.includes(current)) {
-    select.value = current;
-  }
-}
-
-function renderOverview() {
-  const stats = state.overview?.stats || {};
-  const portfolio = state.overview?.overview || {};
-
-  document.getElementById("overviewStats").innerHTML = [
-    ["Total Tenants", stats.total_users || 0],
-    ["Messages", state.messages.length || 0],
-    ["Pending Notices", state.notices.filter((notice) => notice.status === "Pending").length],
-    ["Open Tickets", state.tickets.filter((ticket) => isTicketOpen(ticket.status)).length],
-    ["Occupied Units", portfolio.occupied_units || 0],
-    ["Vacant Units", portfolio.vacant_units || 0],
-  ]
-    .map(
-      ([label, value]) =>
-        `<article class="panel"><div class="title">${esc(label)}</div><div class="value">${esc(value)}</div></article>`
-    )
-    .join("");
-
-  document.getElementById("actionQueue").innerHTML = [
-    ["Pending payment reviews", (state.payments.payments || []).filter((payment) => paymentNeedsReview(payment)).length],
-    ["Pending vacating notices", state.notices.filter((notice) => notice.status === "Pending").length],
-    ["Open tickets", state.tickets.filter((ticket) => isTicketOpen(ticket.status)).length],
-  ]
-    .map(
-      ([label, value]) =>
-        `<div class="item"><strong>${esc(label)}</strong><div class="muted">${esc(value)}</div></div>`
-    )
-    .join("");
-
-  document.getElementById("occupiedUnitsInput").value = Number(portfolio.occupied_units || 0);
-  document.getElementById("vacantUnitsInput").value = Number(portfolio.vacant_units || 0);
-}
-function renderTenantOptions() {
-  const select = document.getElementById("messageTenant");
-  const current = select.value;
-  if (!state.users.length) {
-    select.innerHTML = `<option value="">No tenants available in ${esc(currentPropertyName())}</option>`;
-    return;
-  }
-
-  select.innerHTML = state.users
-    .map((user) => {
-      const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
-      return `<option value="${esc(user.tenant_id)}">${esc(tenantName)}</option>`;
-    })
-    .join("");
-
-  const tenantIds = state.users.map((user) => user.tenant_id);
-  select.value = tenantIds.includes(current) ? current : tenantIds[0];
-}
-
-function filteredTenants() {
-  const floor = document.getElementById("tenantFloorFilter").value;
-  const search = document.getElementById("tenantSearch").value.trim().toLowerCase();
-
-  return state.users.filter((user) => {
-    const matchesFloor = !floor || String(user.floor_number || "") === String(floor);
-    const matchesSearch =
-      !search ||
-      `${user.first_name || ""} ${user.last_name || ""} ${user.tenant_id || ""} ${user.house_number || ""}`
-        .toLowerCase()
-        .includes(search);
-    return matchesFloor && matchesSearch;
-  });
-}
-
-function buildTenantListEmptyState() {
-  const provider = String(state.meta?.database_provider || "").trim().toLowerCase();
-  if (provider === "postgres") {
-    return `<div class="item">
-      <strong>No tenants found for ${esc(currentPropertyName())} in the deployed Postgres database.</strong>
-      <div class="muted">If your records were created locally in SQLite, they do not sync automatically. Run <code>npm run migrate:sqlite-to-postgres</code> against the same Render Postgres database, then refresh this page.</div>
-    </div>`;
-  }
-
-  return `<div class="item">
-    <strong>No tenants yet for ${esc(currentPropertyName())}.</strong>
-    <div class="muted">Create the first tenant from the form on this page to populate this property dashboard.</div>
-  </div>`;
-}
-
-function buildTenantPreviewEmptyState() {
-  if (state.users.length) {
-    return '<div class="item">Choose a tenant to preview their record.</div>';
-  }
-  return buildTenantListEmptyState();
-}
-
-function renderTenants() {
-  const users = filteredTenants();
-  const emptyState = state.users.length ? '<div class="item">No tenants match the current filter.</div>' : buildTenantListEmptyState();
-  document.getElementById("tenantCards").innerHTML =
-    users
-      .map((user) => {
-        const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
-        const lastSeen = user.last_seen_at ? `${formatRelativeTime(user.last_seen_at)} | ${formatDateTime(user.last_seen_at)}` : "No activity yet";
-        const lastLogin = user.last_login_at ? formatDateTime(user.last_login_at) : "No login yet";
-        return `<article class="item">
-          <div class="toolbar">
-            <strong>${esc(tenantName)}</strong>
-            <span class="pill">Floor ${esc(user.floor_number || "-")}</span>
-            ${renderActivityPill(user)}
-          </div>
-          <div class="muted">Tenant ID: ${esc(user.tenant_id || "-")}</div>
-          <div class="muted">Unit ${esc(user.house_number || "-")} | Phone ${esc(user.phone_number || "-")}</div>
-          <div class="muted">Last seen ${esc(lastSeen)} | Last login ${esc(lastLogin)}</div>
-          <div class="muted">Balance ${esc(money(user.account_balance || 0))} | Arrears ${esc(money(user.arrears || 0))} | Deposit ${esc(money(user.deposit || 0))}</div>
-          <div class="toolbar" style="margin-top:10px;">
-            <button class="btn secondary openTenantBtn" data-tenant="${esc(user.tenant_id)}" type="button">Open Record</button>
-            <button class="btn danger deleteBtn" data-tenant="${esc(user.tenant_id)}" type="button">Delete</button>
-          </div>
-        </article>`;
-      })
-      .join("") || emptyState;
-
-  const first = users[0];
-  document.getElementById("tenantPreview").innerHTML = first
-    ? `<div class="item">
-        <strong>${esc(`${first.first_name || ""} ${first.last_name || ""}`.trim() || first.tenant_id)}</strong>
-        <div class="toolbar" style="margin-top:10px;">${renderActivityPill(first)}</div>
-        <div class="muted">Tenant ID: ${esc(first.tenant_id || "-")}</div>
-        <div class="muted">Floor ${esc(first.floor_number || "-")} | Unit ${esc(first.house_number || "-")}</div>
-        <div class="muted">Last seen ${esc(first.last_seen_at ? formatRelativeTime(first.last_seen_at) : "No activity yet")}</div>
-        <div class="muted">Deposit ${esc(money(first.deposit || 0))}</div>
-      </div>`
-    : buildTenantPreviewEmptyState();
-}
-
-function renderTenantDetail() {
-  const detail = state.tenantDetail;
-  if (!detail) {
-    document.getElementById("tenantDetail").innerHTML = "";
-    return;
-  }
-
-  const tenant = detail.tenant || {};
-  const bills = detail.bills || {};
-  const lease = detail.lease || null;
-  const recentPayments = (detail.payments || []).slice(0, 5);
-  const recentTickets = (detail.maintenance || []).slice(0, 5);
-  const recentMessages = (detail.messages || []).slice(0, 5);
-  const recentTransactions = (detail.transactions || []).slice(0, 5);
-  const recentNotices = (detail.notices || []).slice(0, 4);
-  const recentArrears = (detail.arrears || []).slice(0, 4);
-  const tenantName = `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || "Tenant";
-  const lastSeenSummary = tenant.last_seen_at
-    ? `${formatRelativeTime(tenant.last_seen_at)} | ${formatDateTime(tenant.last_seen_at)}`
-    : "No activity recorded yet";
-  const lastLoginSummary = tenant.last_login_at ? formatDateTime(tenant.last_login_at) : "No tenant login yet";
-
-  document.getElementById("tenantDetail").innerHTML = `
-    <div class="tenant-detail-shell">
-      <section class="panel">
-        <div class="detail-hero">
-          <div>
-            <div class="pill">Full Record</div>
-            <h2 style="margin:12px 0 8px;font-size:34px;">${esc(tenantName)}</h2>
-            <div class="muted">Tenant ID: ${esc(tenant.tenant_id || "-")}</div>
-            <div class="muted">Property: ${esc(tenant.property_name || "-")} | Floor ${esc(tenant.floor_number || "-")} | Unit ${esc(tenant.house_number || "-")}</div>
-            <div class="muted">Phone: ${esc(tenant.phone_number || "-")} | Joined ${esc(formatDate(tenant.date_created || tenant.created_at))}</div>
-            <div class="toolbar" style="margin-top:12px;">
-              ${renderActivityPill(tenant)}
-              <span class="pill">Last Seen ${esc(tenant.last_seen_at ? formatRelativeTime(tenant.last_seen_at) : "Never")}</span>
-            </div>
-            <div class="muted">Last seen: ${esc(lastSeenSummary)}</div>
-            <div class="muted">Last login: ${esc(lastLoginSummary)}</div>
-          </div>
-          <div class="item">
-            <div class="title">Balance Snapshot</div>
-            <div class="value">${esc(money(tenant.account_balance || 0))}</div>
-            <div class="muted">Arrears: ${esc(money(tenant.arrears || 0))}</div>
-            <div class="muted">Deposit held: ${esc(money(tenant.deposit || 0))}</div>
-            <div class="muted">Current bill total: ${esc(money(bills.total || 0))}</div>
-            <div class="muted">Repair total: ${esc(money(detail.summary?.total_repair_cost || 0))}</div>
-            <div class="muted">Presence: ${esc(humanizeActivityStatus(tenant.activity_status || "NEVER_SEEN"))}</div>
-          </div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OTIC Admin Console</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Raleway:wght@400;500;600;700;800&display=swap');
+      :root {
+        --bg: #eefbfb;
+        --surface: #ffffff;
+        --surface-soft: #e8f8f8;
+        --border: #c7ecec;
+        --text: #123638;
+        --muted: #5f7f80;
+        --primary: #11a7a7;
+        --primary-deep: #0b7f7f;
+        --success: #198c5b;
+        --warning: #b36a00;
+        --danger: #b42318;
+        --sidebar: #073a3a;
+        --shadow: 0 20px 38px rgba(17, 118, 118, 0.12);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        margin: 0;
+        font-family: "Raleway", "Segoe UI", Arial, sans-serif;
+        background: radial-gradient(circle at 15% 0%, #f5ffff 0%, #eafafa 45%, #e2f6f6 100%);
+        color: var(--text);
+      }
+      button, input, select { font: inherit; }
+      .app { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+      .sidebar { background: var(--sidebar); color: white; padding: 18px 16px 20px; display: flex; flex-direction: column; gap: 22px; }
+      .brand { display: flex; align-items: center; gap: 12px; padding: 4px 0; border-radius: 0; background: transparent; }
+      .brand img { display: block; width: 160px; max-width: 100%; height: auto; }
+      .nav { display: grid; gap: 6px; }
+      .nav button {
+        display: block; width: 100%; color: rgba(255,255,255,0.82); text-decoration: none; text-align: left; padding: 10px 12px;
+        border: 0; border-radius: 9px; font-weight: 600; background: transparent; cursor: pointer;
+      }
+      .nav button.is-hidden { display: none; }
+      .nav button.active, .nav button:hover { background: rgba(255,255,255,0.08); color: white; }
+      .logout { margin-top: auto; border: none; border-radius: 10px; background: #b42318; color: white; padding: 11px 12px; font-weight: 700; cursor: pointer; }
+      .main { padding: 24px 26px 40px; }
+      .topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 18px; }
+      .eyebrow { color: var(--muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+      h1 { margin: 8px 0 0; font-size: clamp(2rem, 2.8vw, 2.7rem); font-family: "Merriweather", Georgia, serif; }
+      .user-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }
+      .status { min-height: 24px; font-size: 0.94rem; color: var(--muted); margin-bottom: 18px; }
+      .status.success { color: var(--success); }
+      .status.error { color: var(--danger); }
+      .page { display: none; }
+      .page.active { display: block; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+      .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 16px; box-shadow: var(--shadow); }
+      .metric-label { font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+      .metric-value { margin-top: 12px; font-weight: 800; font-size: clamp(1.45rem, 2vw, 2rem); }
+      .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
+      .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
+      .panel h2 { margin: 0; font-size: 1.08rem; font-family: "Merriweather", Georgia, serif; }
+      .two-col { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 18px; margin-top: 18px; }
+      .bar-chart { display: grid; gap: 12px; }
+      .bar-row { display: flex; align-items: center; gap: 10px; }
+      .bar-row span { width: 120px; color: var(--muted); font-size: 0.8rem; }
+      .bar-track { flex: 1; height: 10px; background: #edf3fb; border-radius: 999px; overflow: hidden; }
+      .bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #54c9c9); }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+      th { color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+      .pill { display: inline-flex; border-radius: 999px; padding: 5px 10px; font-size: 0.7rem; font-weight: 700; border: 1px solid var(--border); }
+      .pill.success { background: #eaf9f3; color: var(--success); }
+      .pill.warning { background: #fff3d9; color: var(--warning); }
+      .pill.info { background: var(--surface-soft); color: var(--primary); }
+      .pill.danger { background: #fde7e7; color: var(--danger); }
+      .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+      .filters input, .filters select, .filters button { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: white; }
+      .filters button { background: var(--primary); color: white; border-color: var(--primary); cursor: pointer; }
+      .tenant-row { cursor: pointer; }
+      .tenant-row:hover { background: #f7fafe; }
+      .drawer-backdrop { position: fixed; inset: 0; background: rgba(15,24,39,0.5); display: none; padding: 18px; z-index: 30; }
+      .drawer-backdrop.visible { display: block; }
+      .drawer { position: relative; width: min(1180px, 100%); height: calc(100vh - 36px); margin: 0 auto; background: white; border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(17, 30, 45, 0.18); transform: translateY(18px); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; padding: 20px; overflow: auto; border-radius: 24px; }
+      .drawer.open { transform: translateY(0); opacity: 1; }
+      .drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 12px; }
+      .close-btn { border: none; background: var(--surface-soft); color: var(--text); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+      .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+      .detail-box { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: #f9fbff; }
+      .detail-box strong { display: block; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+      .fullscreen-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 18px; align-items: start; }
+      .detail-stack { display: grid; gap: 12px; }
+      .tenant-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .tenant-editor-grid .field-stack:last-child:nth-child(odd) { grid-column: 1 / -1; }
+      .drawer-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+      .alerts-shell { display: grid; gap: 16px; }
+      .alerts-toolbar { display: flex; justify-content: space-between; align-items: end; gap: 14px; flex-wrap: wrap; }
+      .alerts-history { border: 1px solid var(--border); border-radius: 16px; background: #f7fbfb; min-height: 360px; max-height: 62vh; overflow: auto; padding: 16px; display: grid; gap: 12px; }
+      .alert-bubble { max-width: min(760px, 100%); border: 1px solid var(--border); border-radius: 16px; padding: 14px; background: white; box-shadow: 0 8px 20px rgba(7, 58, 58, 0.06); }
+      .alert-bubble.is-self { margin-left: auto; background: #eaf9f9; border-color: #aee6e6; }
+      .alert-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 0.82rem; margin-bottom: 8px; }
+      .alert-body { white-space: pre-wrap; line-height: 1.5; }
+      .alerts-compose { display: grid; gap: 12px; }
+      .alerts-compose textarea { width: 100%; min-height: 130px; resize: vertical; border: 1px solid var(--border); border-radius: 16px; padding: 14px; font: inherit; background: white; }
+      .alerts-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .document-upload { display: grid; gap: 12px; }
+      .document-forms { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+      .document-forms input, .document-forms select { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; width: 180px; }
+      .document-list { display: grid; gap: 12px; margin-top: 16px; }
+      .document-item { display: flex; gap: 12px; border: 1px solid var(--border); border-radius: 12px; padding: 12px; align-items: center; }
+      .doc-thumb { width: 64px; height: 64px; border-radius: 10px; background: var(--surface-soft); display: grid; place-items: center; font-weight: 700; color: var(--primary); }
+      .preview-pane { min-height: 520px; border: 1px solid var(--border); border-radius: 12px; background: linear-gradient(180deg, #fdfcf9 0%, #f5f2ea 100%); display: grid; place-items: center; padding: 20px; }
+      .preview-pane img, .preview-pane iframe { width: 100%; min-height: 480px; border: 0; object-fit: contain; background: white; border-radius: 10px; }
+      .loading-overlay { position: fixed; inset: 0; display: none; place-items: center; background: rgba(20,35,52,0.3); }
+      .loading-overlay.visible { display: grid; }
+      .spinner { width: 46px; height: 46px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.9s linear infinite; }
+      .topbar-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .property-switcher { display: grid; gap: 6px; min-width: 180px; }
+      .property-switcher select,
+      .field-stack input,
+      .field-stack select,
+      .money-input,
+      .text-input,
+      .month-input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: white;
+        padding: 9px 10px;
+      }
+      .property-switcher.is-hidden { display: none; }
+      .page-toolbar { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+      .field-stack { display: grid; gap: 6px; min-width: 180px; }
+      .segment { display: flex; gap: 8px; flex-wrap: wrap; }
+      .segment button,
+      .subtle-action,
+      .secondary-btn,
+      .danger-btn {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: white;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .segment button.active,
+      .subtle-action.active { background: var(--primary); border-color: var(--primary); color: white; }
+      .secondary-btn { border-radius: 10px; }
+      .danger-btn { border-color: #f2b8b5; color: var(--danger); }
+      .table-wrap { overflow: auto; }
+      .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .summary-card { border: 1px solid var(--border); border-radius: 12px; background: #f4fefe; padding: 12px; }
+      .summary-card strong { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+      .summary-card span { display: block; margin-top: 8px; font-size: 1.1rem; font-weight: 800; }
+      .money-input[disabled],
+      .text-input[disabled] { background: #f5f8fc; color: var(--muted); }
+      .cell-stack { display: grid; gap: 8px; min-width: 120px; }
+      .hint-text { color: var(--muted); font-size: 0.8rem; }
+      .nowrap { white-space: nowrap; }
+      .payment-row-detail td { background: #fbfdff; }
+      .detail-card { border: 1px solid var(--border); border-radius: 12px; background: white; padding: 14px; }
+      .detail-card h3 { margin: 0 0 10px; font-size: 1rem; }
+      .inline-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; align-items: end; }
+      .history-table th, .history-table td { padding: 8px 6px; }
+      .empty-state { padding: 18px 0; color: var(--muted); }
+      .tab-strip { display: flex; gap: 10px; margin-bottom: 16px; }
+      .tab-strip button { border: 1px solid var(--border); border-radius: 999px; background: white; padding: 9px 14px; font-weight: 700; cursor: pointer; }
+      .tab-strip button.active { background: var(--primary); color: white; border-color: var(--primary); }
+      .utility-panel[hidden] { display: none; }
+      .bulk-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+      .compact-stack { display: grid; gap: 6px; min-width: 160px; }
+      .muted-block { color: var(--muted); font-size: 0.85rem; }
+      .save-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .search-wrap { position: relative; min-width: 260px; }
+      .search-wrap::before { content: ""; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; border: 2px solid #9a8d79; border-radius: 50%; }
+      .search-wrap::after { content: ""; position: absolute; left: 24px; top: 56%; width: 7px; height: 2px; background: #9a8d79; transform: rotate(38deg); border-radius: 2px; }
+      .search-wrap input { padding-left: 36px !important; border-radius: 999px !important; background: #fffcf6 !important; }
+      .tenant-add-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 14px 0 18px; align-items: end; }
+      .tenant-add-grid .secondary-btn { height: 40px; }
+      .preview-wide { margin-top: 16px; }
+      .modern-select { border-radius: 999px !important; background: #fffcf6 !important; }
+      .month-year-wrap { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+      .month-year-wrap .field-stack { min-width: 130px; }
+      .file-pick-wrap { display: flex; gap: 10px; align-items: center; }
+      .file-pick-wrap .file-name { color: var(--muted); font-size: 0.85rem; }
+      #uploadDocumentBtn,
+      #generateReportBtn,
+      #saveOccupancyBtn,
+      #saveWaterRateBtn {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+      }
+      #addTenantBtn,
+      .js-save-statement,
+      .js-save-water,
+      .js-record-payment {
+        background: var(--success);
+        color: white;
+        border-color: var(--success);
+      }
+      #applyGarbageToFloorBtn {
+        background: #eaa126;
+        color: #2f2412;
+        border-color: #eaa126;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (max-width: 900px) {
+        .app { grid-template-columns: 1fr; }
+        .two-col { grid-template-columns: 1fr; }
+        .topbar { flex-direction: column; align-items: flex-start; }
+        .fullscreen-layout,
+        .tenant-editor-grid { grid-template-columns: 1fr; }
+        .drawer-backdrop { padding: 10px; }
+        .drawer { height: calc(100vh - 20px); padding: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loadingOverlay" class="loading-overlay visible"><div class="spinner"></div></div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand" aria-label="OTIC logo">
+          <img src="/Otic%20Apartments%20Brand.png" alt="Otic Apartments logo" />
         </div>
-      </section>
+        <nav class="nav" aria-label="Sidebar navigation">
+          <button class="nav-btn active" data-target="overview">Overview</button>
+          <button class="nav-btn" data-target="tenants">Tenants</button>
+          <button class="nav-btn" data-target="alerts">Alerts</button>
+          <button class="nav-btn" data-target="documents">Documents</button>
+          <button class="nav-btn" data-target="payment">Payment</button>
+          <button class="nav-btn" data-target="reports">Reports</button>
+          <button class="nav-btn" data-target="utilities">Utilities</button>
+        </nav>
+        <button id="logoutBtn" class="logout" type="button">Logout</button>
+      </aside>
 
-      <div class="grid stats">
-        ${[
-          ["Unread Messages", detail.summary?.unread_messages || 0],
-          ["Open Tickets", detail.summary?.open_tickets || 0],
-          ["Pending Notices", detail.summary?.pending_notices || 0],
-          ["Pending Payments", detail.summary?.pending_payments || 0],
-          ["Repair Cost Total", money(detail.summary?.total_repair_cost || 0)],
-        ]
-          .map(
-            ([label, value]) =>
-              `<article class="panel"><div class="title">${esc(label)}</div><div class="value">${esc(value)}</div></article>`
-          )
-          .join("")}
-      </div>
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">Operations</div>
+            <h1 id="pageTitle">Overview</h1>
+          </div>
+          <div class="topbar-actions">
+            <label id="propertySwitcher" class="property-switcher is-hidden">
+              <span class="eyebrow">Property</span>
+              <select id="propertySelect"></select>
+            </label>
+            <div class="user-pill"><span class="dot"></span><span id="adminUser">Admin</span></div>
+          </div>
+        </header>
 
-      <div class="detail-grid">
-        <section class="panel detail-section">
-          <h3 class="section-heading">Account Summary</h3>
-          <div class="list">
-            <article class="item">
-              <strong>Bill Breakdown</strong>
-              <div class="muted" style="margin-top:10px;">Rent: ${esc(money(bills.rent || 0))}</div>
-              <div class="muted">Water: ${esc(money(bills.water || 0))}</div>
-              <div class="muted">Trash: ${esc(money(bills.trash || 0))}</div>
-              <div class="muted">Electricity: ${esc(money(bills.electricity || 0))}</div>
-            </article>
-            <article class="item">
-              <strong>Edit Account Values</strong>
-              <form class="stack tenantBillingForm" data-tenant="${esc(tenant.tenant_id || "")}" style="margin-top:10px;">
-                <div class="filters">
-                  <div><label>Rent</label><input name="rent" type="number" min="0" step="0.01" value="${esc(Number(bills.rent || 0))}" /></div>
-                  <div><label>Water</label><input name="water" type="number" min="0" step="0.01" value="${esc(Number(bills.water || 0))}" /></div>
-                  <div><label>Trash</label><input name="trash" type="number" min="0" step="0.01" value="${esc(Number(bills.trash || 0))}" /></div>
-                  <div><label>Electricity</label><input name="electricity" type="number" min="0" step="0.01" value="${esc(Number(bills.electricity || 0))}" /></div>
-                  <div><label>Deposit</label><input name="deposit" type="number" min="0" step="0.01" value="${esc(Number(tenant.deposit || 0))}" /></div>
+        <div id="status" class="status success">Loading portfolio data…</div>
+
+        <section id="overviewPage" class="page active">
+          <div class="page-toolbar">
+            <div class="month-year-wrap">
+              <label class="field-stack"><span>Month</span><select id="overviewMonthSelect" class="modern-select"></select></label>
+              <label class="field-stack"><span>Year</span><select id="overviewYearSelect" class="modern-select"></select></label>
+            </div>
+            <div class="month-year-wrap">
+              <label class="field-stack"><span>Occupied Units</span><input id="occupiedUnitsInput" class="money-input" type="number" min="0" step="1" /></label>
+              <label class="field-stack"><span>Vacant Units</span><input id="vacantUnitsInput" class="money-input" type="number" min="0" step="1" /></label>
+              <button id="saveOccupancyBtn" class="secondary-btn" type="button">Save Units</button>
+            </div>
+          </div>
+          <div class="grid" id="overviewMetrics"></div>
+          <div class="panel" style="margin-top: 16px;">
+            <div class="panel-header"><h2>Portfolio health</h2><span class="pill info" id="portfolioLabel">OTIC 1</span></div>
+            <div class="bar-chart" id="portfolioBars"></div>
+          </div>
+          <div class="two-col">
+            <div class="panel">
+              <div class="panel-header"><h2>Performance trend</h2><span class="pill success" id="trendBadge">Monthly</span></div>
+              <svg id="performanceChart" viewBox="0 0 500 220" width="100%" height="220" aria-label="Performance trend chart"></svg>
+            </div>
+            <div class="panel">
+              <div class="panel-header"><h2>Collection mix</h2><span class="pill info" id="mixBadge">Current</span></div>
+              <div class="bar-chart" id="collectionMix"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tenantsPage" class="page">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Tenant directory</h2>
+              <span id="tenantBadge" class="pill info">OTIC 1</span>
+            </div>
+            <div class="filters">
+              <div class="search-wrap">
+                <input id="tenantSearch" type="text" placeholder="Search tenant, unit, or phone" />
+              </div>
+              <select id="tenantFloorFilter" class="modern-select">
+                <option value="">Select floor</option>
+              </select>
+              <button id="resetFilters" type="button">Reset</button>
+            </div>
+            <div class="tenant-add-grid">
+              <label class="compact-stack"><span>Tenant Name</span><input id="newTenantName" class="text-input" type="text" placeholder="e.g. Jane Wambui" /></label>
+              <label class="compact-stack"><span>Floor</span><input id="newTenantFloor" class="text-input" type="text" placeholder="0, 1, 2..." /></label>
+              <label class="compact-stack"><span>Unit Number</span><input id="newTenantUnit" class="text-input" type="text" placeholder="e.g. A-103" /></label>
+              <label class="compact-stack"><span>Rent</span><input id="newTenantRent" class="money-input" type="number" min="0" step="0.01" /></label>
+              <label class="compact-stack"><span>Deposit</span><input id="newTenantDeposit" class="money-input" type="number" min="0" step="0.01" /></label>
+              <label class="compact-stack"><span>Phone Number</span><input id="newTenantPhone" class="text-input" type="text" placeholder="07..." /></label>
+              <button id="addTenantBtn" class="secondary-btn" type="button">Add Tenant</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Tenant</th><th>Floor</th><th>Unit</th><th>Phone</th><th>Rent</th><th>Deposit</th></tr>
+              </thead>
+              <tbody id="tenantTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="alertsPage" class="page">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Admin alerts</h2>
+              <span id="alertsBadge" class="pill warning">Private channel</span>
+            </div>
+            <div class="alerts-shell">
+              <div class="alerts-toolbar">
+                <div>
+                  <div class="eyebrow">Visibility</div>
+                  <div id="alertsContext" class="muted-block">Only the sender and the superadmin can view each alert thread.</div>
                 </div>
-                <label class="item" style="display:flex;gap:12px;align-items:flex-start;margin:0;padding:14px;cursor:pointer;">
-                  <input name="reset_account_balance" type="checkbox" value="true" style="margin-top:4px;" />
-                  <span>
-                    <strong>Reset outstanding balance to 0</strong>
-                    <div class="muted" style="margin-top:6px;">Saving with this selected clears the tenant's current rent, water, trash, and electricity payable amounts to zero.</div>
-                  </span>
+                <label id="alertsThreadPicker" class="field-stack" hidden>
+                  <span>Property admin thread</span>
+                  <select id="alertsThreadSelect" class="modern-select"></select>
                 </label>
-                <div class="muted">The total account balance recalculates automatically from the payable amounts you save here.</div>
-                <div class="muted">Rent reminders show until the 7th. Late-payment alerts start 5 days later if no payment is recorded.</div>
-                <button class="btn secondary" type="submit">Save Account Values</button>
-              </form>
-            </article>
-            <article class="item">
-              <strong>Deposit Held</strong>
-              <div class="muted" style="margin-top:10px;">${esc(money(tenant.deposit || 0))}</div>
-            </article>
-            <article class="item">
-              <strong>Lease Snapshot</strong>
-              ${
-                lease
-                  ? `<div class="muted" style="margin-top:10px;">${esc(lease.lease_name || "Active lease")}</div>
-                     <div class="muted">Start: ${esc(formatDate(lease.start_date))}</div>
-                     <div class="muted">End: ${esc(formatDate(lease.end_date))}</div>
-                     <div class="muted">Monthly rent: ${esc(money(lease.monthly_rent || bills.rent || 0))}</div>`
-                  : '<div class="muted" style="margin-top:10px;">No active lease is recorded for this tenant.</div>'
-              }
-            </article>
+              </div>
+              <div id="alertsHistory" class="alerts-history"><div class="empty-state">Loading alerts…</div></div>
+              <div class="alerts-compose">
+                <textarea id="alertMessageInput" placeholder="Type an internal alert or reply here."></textarea>
+                <div class="alerts-footer">
+                  <div class="muted-block" id="alertsHint">Messages keep their full date and time history.</div>
+                  <button id="sendAlertBtn" class="secondary-btn" type="button">Send alert</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section class="panel detail-section">
-          <h3 class="section-heading">Recent Payments</h3>
-          ${renderRecordCollection(
-            recentPayments.map((payment) => {
-              const label = humanizeStatus(payment.status || "PENDING_CONFIRMATION");
-              return `<article class="item payment-${statusClass(payment.status)}">
-                <div class="toolbar">
-                  <strong>${esc(money(payment.amount || 0))}</strong>
-                  ${renderStatusPill(payment.status || "PENDING_CONFIRMATION", label)}
-                </div>
-                <div class="muted">${esc(payment.payment_for || "RENT")} | ${esc(payment.method || "-")}</div>
-                <div class="muted">Confirmation Code: ${esc(payment.reference || "-")} | Paid at ${esc(formatDateTime(payment.payment_time || payment.created_at))}</div>
-                <div class="muted">Submitted ${esc(formatDateTime(payment.created_at))}</div>
-              </article>`;
-            }),
-            "No payments recorded for this tenant yet."
-          )}
-        </section>
-      </div>
-
-      <div class="detail-grid">
-        <section class="panel detail-section">
-          <h3 class="section-heading">Maintenance</h3>
-          ${renderRecordCollection(
-            recentTickets.map((ticket) => {
-              const label = ticketStatusValue(ticket.status);
-              return `<article class="item ticket-${statusClass(label)}">
-                <div class="toolbar">
-                  <strong>${esc(ticket.title || "Ticket")}</strong>
-                  ${renderStatusPill(label)}
-                </div>
-                <div>${esc(ticket.description || "No details provided.")}</div>
-                <div class="muted">Repair cost: ${esc(money(ticket.repair_cost || 0))}</div>
-                <div class="muted">Updated ${esc(formatDateTime(ticket.updated_at))}</div>
-              </article>`;
-            }),
-            "No maintenance tickets logged for this tenant."
-          )}
-        </section>
-
-        <section class="panel detail-section">
-          <h3 class="section-heading">Messages</h3>
-          ${renderRecordCollection(
-            recentMessages.map((message) => {
-              const sender = `${message.sender_name || ""}`.trim() || message.sender_type || "System";
-              return `<article class="item">
-                <div class="toolbar">
-                  <strong>${esc(message.subject || "Message")}</strong>
-                  <span class="pill">${esc(message.sender_type || "SYSTEM")}</span>
-                </div>
-                <div class="muted">${esc(sender)} | ${esc(formatDateTime(message.created_at))}</div>
-                <div>${esc(message.body || "")}</div>
-              </article>`;
-            }),
-            "No messages recorded for this tenant yet."
-          )}
-        </section>
-      </div>
-
-      <div class="detail-grid">
-        <section class="panel detail-section">
-          <h3 class="section-heading">Notices And Arrears</h3>
-          <div class="list">
-            <article class="item">
-              <strong>Vacating Notices</strong>
-              ${
-                recentNotices.length
-                  ? recentNotices
-                      .map((notice) => {
-                        const label = humanizeStatus(notice.status || "Pending");
-                        return `<div class="muted" style="margin-top:10px;">${esc(formatDate(notice.move_out_date))} - ${label}</div>`;
-                      })
-                      .join("")
-                  : '<div class="muted" style="margin-top:10px;">No vacating notices submitted.</div>'
-              }
-            </article>
-            <article class="item">
-              <strong>Arrears</strong>
-              ${
-                recentArrears.length
-                  ? recentArrears
-                      .map(
-                        (arrear) =>
-                          `<div class="muted" style="margin-top:10px;">${esc(arrear.description || "Outstanding balance")} - ${esc(
-                            money(arrear.balance || 0)
-                          )}${arrear.due_date ? ` | Due ${esc(formatDate(arrear.due_date))}` : ""}</div>`
-                      )
-                      .join("")
-                  : '<div class="muted" style="margin-top:10px;">No arrears entries recorded.</div>'
-              }
-            </article>
+        <section id="documentsPage" class="page">
+          <div class="panel document-upload">
+            <div class="panel-header"><h2>Shared documents</h2><span class="pill info" id="documentBadge">OTIC 1</span></div>
+            <div class="document-forms">
+              <input id="docName" type="text" placeholder="Document name" />
+              <div class="file-pick-wrap">
+                <input id="docFile" type="file" hidden />
+                <button id="pickDocFileBtn" class="secondary-btn" type="button">Choose file</button>
+                <span id="docFileName" class="file-name">No file selected</span>
+              </div>
+              <button id="uploadDocumentBtn" class="secondary-btn" type="button">Upload Document</button>
+            </div>
+            <div id="documentList" class="document-list"></div>
+            <div class="panel preview-wide">
+              <div class="panel-header"><h2>Document preview</h2></div>
+              <div id="docPreview" class="preview-pane">Select a document to preview.</div>
+            </div>
           </div>
         </section>
 
-        <section class="panel detail-section">
-          <h3 class="section-heading">Transactions</h3>
-          ${renderRecordCollection(
-            recentTransactions.map((transaction) => {
-              return `<article class="item">
-                <div class="toolbar">
-                  <strong>${esc(transaction.type || "Transaction")}</strong>
-                  <span class="pill">${esc(money(transaction.amount || 0))}</span>
-                </div>
-                <div>${esc(transaction.description || "No description provided.")}</div>
-                <div class="muted">${esc(formatDateTime(transaction.date_created || transaction.created_at))}</div>
-              </article>`;
-            }),
-            "No transactions recorded for this tenant yet."
-          )}
+        <section id="reportsPage" class="page">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Property report</h2>
+              <button id="generateReportBtn" type="button">Generate report</button>
+            </div>
+            <div class="grid" id="reportMetrics"></div>
+            <div>
+              <h3>Arithmetic summary</h3>
+              <table>
+                <tbody id="reportTable"></tbody>
+              </table>
+            </div>
+          </div>
         </section>
-      </div>
+
+        <section id="paymentPage" class="page">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Payment statement</h2>
+              <span id="paymentPropertyBadge" class="pill info">OTIC 1</span>
+            </div>
+            <div class="page-toolbar">
+              <div class="month-year-wrap">
+                <label class="field-stack"><span>Month</span><select id="paymentMonthSelect" class="modern-select"></select></label>
+                <label class="field-stack"><span>Year</span><select id="paymentYearSelect" class="modern-select"></select></label>
+                <label class="field-stack"><span>Floor</span><select id="paymentFloorSelect" class="modern-select"></select></label>
+              </div>
+            </div>
+            <div id="paymentSummary" class="summary-grid"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tenant Name</th>
+                    <th>House No.</th>
+                    <th>Bal. B/F</th>
+                    <th>Deposit</th>
+                    <th>Water Bill</th>
+                    <th>Garbage</th>
+                    <th>Rent Bill</th>
+                    <th>Dues</th>
+                    <th>Payment Made</th>
+                    <th>Date</th>
+                    <th>Receipt No.</th>
+                    <th>Balance</th>
+                    <th>Remarks</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="utilitiesPage" class="page">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Utilities</h2>
+              <span id="utilitiesPropertyBadge" class="pill info">OTIC 1</span>
+            </div>
+            <div class="page-toolbar">
+              <div class="month-year-wrap">
+                <label class="field-stack"><span>Month</span><select id="utilitiesMonthSelect" class="modern-select"></select></label>
+                <label class="field-stack"><span>Year</span><select id="utilitiesYearSelect" class="modern-select"></select></label>
+                <label class="field-stack"><span>Floor</span><select id="utilitiesFloorSelect" class="modern-select"></select></label>
+                <label class="field-stack"><span>Water Rate (All Tenants)</span><input id="waterRateInput" class="money-input" type="number" min="0" step="0.01" /></label>
+                <button id="saveWaterRateBtn" class="secondary-btn" type="button">Save Rate</button>
+              </div>
+            </div>
+            <div class="tab-strip">
+              <button id="waterTabBtn" class="active" type="button" data-utility-tab="water">Water</button>
+              <button id="garbageTabBtn" type="button" data-utility-tab="garbage">Garbage</button>
+            </div>
+            <div id="waterUtilityPanel" class="utility-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tenant</th>
+                      <th>House No.</th>
+                      <th>Previous Meter Reading</th>
+                      <th>Latest Meter Reading</th>
+                      <th>Consumption</th>
+                      <th>Rate</th>
+                      <th>Water Bill</th>
+                    </tr>
+                  </thead>
+                  <tbody id="waterTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="garbageUtilityPanel" class="utility-panel" hidden>
+              <div class="bulk-actions">
+                <label class="compact-stack">
+                  <span>Bulk garbage amount</span>
+                  <input id="garbageBulkAmount" class="money-input" type="number" min="0" step="0.01" value="0" />
+                </label>
+                <button id="applyGarbageToFloorBtn" class="secondary-btn" type="button">Add to Floor</button>
+                <button id="applyGarbageToAllBtn" class="danger-btn" type="button">Add to All Tenants</button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tenant</th>
+                      <th>House No.</th>
+                      <th>Garbage</th>
+                    </tr>
+                  </thead>
+                  <tbody id="garbageTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
-  `;
-}
-function renderMessages() {
-  const sender = document.getElementById("messageSenderFilter").value;
-  const search = document.getElementById("messageSearch").value.trim().toLowerCase();
-  const items = state.messages.filter((message) => {
-    const matchesSender = !sender || message.sender_type === sender;
-    const matchesSearch =
-      !search ||
-      `${message.first_name || ""} ${message.last_name || ""} ${message.subject || ""} ${message.category || ""} ${message.body || ""}`
-        .toLowerCase()
-        .includes(search);
-    return matchesSender && matchesSearch;
-  });
 
-  document.getElementById("messageList").innerHTML =
-    items
-      .map((message) => {
-        const senderName = `${message.first_name || ""} ${message.last_name || ""}`.trim() || message.sender_name || "System";
-        return `<article class="item">
-          <div class="toolbar">
-            <strong>${esc(message.subject || "Message")}</strong>
-            <span class="pill">${esc(message.sender_type || "SYSTEM")}</span>
-          </div>
-          <div class="muted">${esc(senderName)} | Unit ${esc(message.house_number || "-")}</div>
-          <div>${esc(message.body || "")}</div>
-        </article>`;
-      })
-      .join("") || '<div class="item">No messages match the current filter.</div>';
-}
+    <div id="drawerBackdrop" class="drawer-backdrop"></div>
+    <aside id="tenantDrawer" class="drawer" aria-label="Tenant details">
+      <div class="drawer-header">
+        <h2 id="tenantDrawerTitle">Tenant details</h2>
+        <button id="closeDrawerBtn" class="close-btn" type="button">Close</button>
+      </div>
+      <div id="tenantDrawerContent"></div>
+    </aside>
 
-function renderDocuments() {
-  document.getElementById("documentList").innerHTML =
-    state.documents
-      .map((doc) => {
-        const actions = doc.url
-          ? `<div class="toolbar" style="margin-top:10px;">
-              <a class="btn secondary" href="${esc(doc.url)}" target="_blank" rel="noopener">Open File</a>
-            </div>`
-          : "";
-        return `<article class="item">
-          <div class="toolbar">
-            <strong>${esc(doc.name || "Document")}</strong>
-            ${renderStatusPill(doc.status || "AVAILABLE", humanizeStatus(doc.status || "AVAILABLE"))}
-          </div>
-          <div class="muted">${esc(doc.category || "General")}</div>
-          <div class="muted">Added ${esc(formatDateTime(doc.created_at))}</div>
-          ${actions}
-        </article>`;
-      })
-      .join("") || `<div class="item">No shared documents have been published yet for ${esc(currentPropertyName())}.</div>`;
-}
+    <script>
+      const statusEl = document.getElementById('status');
+      const adminUserEl = document.getElementById('adminUser');
+      const pageTitleEl = document.getElementById('pageTitle');
+      const tenantSearch = document.getElementById('tenantSearch');
+      const tenantFloorFilter = document.getElementById('tenantFloorFilter');
+      const loadingOverlay = document.getElementById('loadingOverlay');
+      const drawer = document.getElementById('tenantDrawer');
+      const drawerBackdrop = document.getElementById('drawerBackdrop');
+      const propertySwitcher = document.getElementById('propertySwitcher');
+      const propertySelect = document.getElementById('propertySelect');
+      let statusTimerId = null;
 
-function renderNotices() {
-  const search = document.getElementById("noticeSearch").value.trim().toLowerCase();
-  const status = document.getElementById("noticeStatusFilter").value;
-  const items = state.notices.filter((notice) => {
-    const matchesStatus = !status || notice.status === status;
-    const matchesSearch =
-      !search ||
-      `${notice.tenant_name || ""} ${notice.house_number || ""} ${notice.property_name || ""}`
-        .toLowerCase()
-        .includes(search);
-    return matchesStatus && matchesSearch;
-  });
+      const state = {
+        session: null,
+        bootstrap: null,
+        reports: null,
+        alerts: { threads: [], messages: [], current_thread_owner_admin_user_id: null, loaded: false },
+        ledger: { month_key: new Date().toISOString().slice(0, 7), selected_floor: null, floors: [], rows: [], summary: null, water_rate: 0 },
+        overviewMonthKey: new Date().toISOString().slice(0, 7),
+        overviewMonthlySummary: null,
+        activePage: 'overview',
+        activeTenantDetail: null,
+        tenantSearch: '',
+        tenantFloor: '',
+        utilityTab: 'water',
+        paymentOpenUserId: null,
+      };
 
-  document.getElementById("noticeList").innerHTML =
-    items
-      .map((notice) => {
-        const actionRow = noticeNeedsReview(notice)
-          ? `<div class="toolbar" style="margin-top:10px;">
-              <button class="btn secondary noticeReviewBtn" data-id="${esc(notice.id)}" data-status="APPROVED" type="button">Approve</button>
-              <button class="btn danger noticeReviewBtn" data-id="${esc(notice.id)}" data-status="DISAPPROVED" type="button">Disapprove</button>
-            </div>`
-          : `<div class="muted" style="margin-top:10px;">Reviewed ${esc(formatDateTime(notice.reviewed_at))}</div>`;
-        return `<article class="item">
-          <div class="toolbar">
-            <strong>${esc(notice.tenant_name || "Tenant")}</strong>
-            ${renderStatusPill(notice.status || "Pending", humanizeStatus(notice.status || "Pending"))}
-          </div>
-          <div class="muted">Unit ${esc(notice.house_number || "-")} | ${esc(notice.property_name || "")}</div>
-          <div>Move-out date: ${esc(formatDate(notice.move_out_date))}</div>
-          ${actionRow}
-        </article>`;
-      })
-      .join("") || '<div class="item">No vacating notices match the current filter.</div>';
-}
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
 
-function renderTickets() {
-  const search = document.getElementById("ticketSearch").value.trim().toLowerCase();
-  const status = document.getElementById("ticketStatusFilter").value;
-  const items = state.tickets.filter((ticket) => {
-    const normalizedStatus = ticketStatusValue(ticket.status);
-    if (!isTicketOpen(normalizedStatus)) {
-      return false;
-    }
-    const matchesStatus = !status || normalizedStatus === status;
-    const matchesSearch =
-      !search ||
-      `${ticket.tenant_name || ""} ${ticket.title || ""} ${normalizedStatus}`.toLowerCase().includes(search);
-    return matchesStatus && matchesSearch;
-  });
+      function formatMoney(value) {
+        return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(Number(value || 0));
+      }
 
-  document.getElementById("ticketList").innerHTML =
-    items
-      .map((ticket) => {
-        const normalizedStatus = ticketStatusValue(ticket.status);
-        const buttons =
-          normalizedStatus === "Pending"
-            ? [
-                `<button class="btn warning ticketStatusBtn" data-id="${esc(ticket.id)}" data-status="In Progress" type="button">Mark In Progress</button>`,
-              ]
-            : [
-                `<button class="btn success ticketStatusBtn" data-id="${esc(ticket.id)}" data-status="Solved" data-repair-cost="${esc(ticket.repair_cost || "0")}" data-title="${esc(ticket.title || "Ticket")}" type="button">Mark Solved</button>`,
-              ];
+      function formatDate(value) {
+        if (!value) return '—';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return '—';
+        const day = String(parsed.getDate()).padStart(2, '0');
+        const month = String(parsed.getMonth() + 1).padStart(2, '0');
+        const year = parsed.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
 
-        return `<article class="item ticket-${statusClass(normalizedStatus)}">
-          <div class="toolbar">
-            <strong>${esc(ticket.title || "Ticket")}</strong>
-            ${renderStatusPill(normalizedStatus)}
-          </div>
-          <div class="muted">${esc(ticket.tenant_name || "Tenant")} | Unit ${esc(ticket.house_number || "-")}</div>
-          <div>${esc(ticket.description || "No details provided.")}</div>
-          <div class="muted">Repair cost so far: ${esc(money(ticket.repair_cost || 0))}</div>
-          <div class="muted">${ticket.technician_name ? `Technician: ${esc(ticket.technician_name)} | ` : ""}Updated ${esc(formatDateTime(ticket.updated_at))}</div>
-          <div class="toolbar" style="margin-top:10px;">${buttons.join("")}</div>
-        </article>`;
-      })
-      .join("") || '<div class="item">No open tickets match the current filter.</div>';
-}
+      function formatDateTime(value) {
+        if (!value) return '—';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return '—';
+        return new Intl.DateTimeFormat('en-KE', { dateStyle: 'medium', timeStyle: 'short' }).format(parsed);
+      }
 
-function renderPaymentSummary() {
-  const summary = state.payments.summary || {};
-  const billing = state.payments.billing || {};
+      function formatMonthLabel(monthKey) {
+        return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(`${monthKey}-01T12:00:00Z`));
+      }
 
-  document.getElementById("paymentStats").innerHTML = [
-    ["Expected Total", money(summary.expected_collection_total || 0)],
-    ["Acquired Total", money(summary.acquired_collection_total || 0)],
-    ["Variance", money(summary.variance || 0)],
-    ["Payment Items", summary.payment_count || 0],
-  ]
-    .map(
-      ([label, value]) =>
-        `<article class="item"><div class="title">${esc(label)}</div><div>${esc(value)}</div></article>`
-    )
-    .join("");
+      function toDdMmYyyyInput(value = new Date()) {
+        const parsed = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+          return '';
+        }
+        const day = String(parsed.getDate()).padStart(2, '0');
+        const month = String(parsed.getMonth() + 1).padStart(2, '0');
+        const year = parsed.getFullYear();
+        return `${day}/${month}/${year}`;
+      }
 
-  document.getElementById("expectedCollection").value = Number(summary.expected_collection_total || 0);
-  document.getElementById("acquiredCollection").value = Number(summary.acquired_collection_total || 0);
-  document.getElementById("billingRent").value = Number(billing.rent || 0);
-  document.getElementById("billingWater").value = Number(billing.water || 0);
-  document.getElementById("billingTrash").value = Number(billing.trash || 0);
-  document.getElementById("billingElectricity").value = Number(billing.electricity || 0);
-}
+      function parseDdMmYyyyToIso(value) {
+        const normalized = String(value || '').trim();
+        const match = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (!match) {
+          return null;
+        }
+        const [, day, month, year] = match;
+        const iso = `${year}-${month}-${day}T12:00:00+03:00`;
+        const parsed = new Date(iso);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+      }
 
-function renderBillingTenantSelection() {
-  const search = document.getElementById("billingTenantSearch").value.trim().toLowerCase();
-  const selected = new Set(state.billingSelection);
-  const filtered = state.users.filter((user) => {
-    if (!search) return true;
-    return `${user.first_name || ""} ${user.last_name || ""} ${user.tenant_id || ""} ${user.house_number || ""}`
-      .toLowerCase()
-      .includes(search);
-  });
+      function getLedgerMonthParts() {
+        const [year, month] = String(state.ledger.month_key || '').split('-');
+        return { year: Number(year), month: Number(month) };
+      }
 
-  document.getElementById("billingSelectionSummary").textContent = `${state.billingSelection.length} of ${state.users.length} tenants selected`;
-  document.getElementById("billingTenantSelection").innerHTML =
-    filtered
-      .map((user) => {
-        const tenantName = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.tenant_id;
-        return `<label class="item check-item">
-          <input class="billingTenantCheckbox" data-tenant="${esc(user.tenant_id)}" type="checkbox" ${
-            selected.has(user.tenant_id) ? "checked" : ""
-          } />
-          <span>
-            <strong>${esc(tenantName)}</strong>
-            <div class="muted">Tenant ID: ${esc(user.tenant_id || "-")}</div>
-            <div class="muted">Floor ${esc(user.floor_number || "-")} | Unit ${esc(user.house_number || "-")}</div>
-          </span>
-        </label>`;
-      })
-      .join("") || '<div class="item">No tenants match this search.</div>';
-}
-
-function renderPaymentList() {
-  const status = document.getElementById("paymentStatusFilter").value;
-  const search = document.getElementById("paymentSearch").value.trim().toLowerCase();
-  const items = (state.payments.payments || []).filter((payment) => {
-    const matchesStatus = !status || payment.status === status;
-    const matchesSearch =
-      !search ||
-      `${payment.tenant_name || ""} ${payment.reference || ""} ${payment.phone_number || ""} ${payment.house_number || ""} ${payment.payment_for || ""}`
-        .toLowerCase()
-        .includes(search);
-    return matchesStatus && matchesSearch;
-  });
-
-  document.getElementById("paymentList").innerHTML =
-    items
-      .map((payment) => {
-        const label = humanizeStatus(payment.status || "PENDING_CONFIRMATION");
-        const actionRow = paymentNeedsReview(payment)
-          ? `<div class="toolbar" style="margin-top:10px;">
-              <button class="btn success paymentReviewBtn" data-id="${esc(payment.id)}" data-status="APPROVED" type="button">Approve</button>
-              <button class="btn danger paymentReviewBtn" data-id="${esc(payment.id)}" data-status="DISAPPROVED" type="button">Disapprove</button>
-            </div>`
-          : `<div class="muted" style="margin-top:10px;">Reviewed ${esc(formatDateTime(payment.reviewed_at))}</div>`;
-        return `<article class="item payment-${statusClass(payment.status)}">
-          <div class="toolbar">
-            <strong>${esc(payment.tenant_name || "Tenant")}</strong>
-            ${renderStatusPill(payment.status || "PENDING_CONFIRMATION", label)}
-          </div>
-          <div class="muted">Unit ${esc(payment.house_number || "-")} | Floor ${esc(payment.floor_number || "-")}</div>
-          <div>${esc(money(payment.amount || 0))} for ${esc(payment.payment_for || "RENT")}</div>
-          <div class="muted">Confirmation Code: ${esc(payment.reference || "-")} | Phone: ${esc(payment.phone_number || "-")}</div>
-          <div class="muted">Paid at ${esc(formatDateTime(payment.payment_time || payment.created_at))} | Submitted ${esc(formatDateTime(payment.created_at))}</div>
-          ${actionRow}
-        </article>`;
-      })
-      .join("") || '<div class="item">No payment items match the current filter.</div>';
-}
-
-async function loadTenantDetail(id) {
-  state.tenantDetail = await fetchJson(`/api/admin/tenants/${encodeURIComponent(id)}/details`);
-  renderTenantDetail();
-  switchTab("tenant-detail");
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function closeTenantDetail() {
-  state.tenantDetail = null;
-  document.getElementById("tenantDetail").innerHTML = "";
-  switchTab("tenants");
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-async function loadConversation() {
-  const id = document.getElementById("messageTenant").value;
-  const data = await fetchJson(`/api/admin/messages/${encodeURIComponent(id)}`);
-  document.getElementById("messageThread").innerHTML = data.messages.length
-    ? data.messages
-        .map(
-          (message) => `<article class="item">
-            <strong>${esc(message.subject || "Message")}</strong>
-            <div class="muted">${esc(message.sender_name || message.sender_type || "System")}</div>
-            <div>${esc(message.body || "")}</div>
-          </article>`
-        )
-        .join("")
-    : '<div class="item">No messages yet for this tenant.</div>';
-  setStatus("Conversation loaded.", false);
-}
-
-async function loadAllData({ force = false } = {}) {
-  if (loadAllDataPromise && !force) {
-    return loadAllDataPromise;
-  }
-
-  const requestId = ++loadAllDataRequestId;
-  const promise = (async () => {
-    const visibleTenantId = getVisibleTenantDetailId();
-    const payload = await fetchJson("/api/admin/bootstrap");
-
-    if (requestId !== loadAllDataRequestId) {
-      return;
-    }
-
-    state.username = payload.username || "Admin";
-    state.properties = payload.properties || [];
-    state.selectedProperty = payload.selected_property || null;
-    state.overview = payload.overview || null;
-    state.meta = payload.meta || {};
-    state.users = payload.users?.users || [];
-    state.documents = payload.documents?.documents || [];
-    state.messages = payload.messages?.messages || [];
-    state.notices = payload.notices?.notices || [];
-    state.tickets = payload.tickets?.tickets || [];
-    state.payments = payload.payments || { summary: {}, billing: {}, payments: [] };
-
-    renderPropertyContext();
-    syncBillingSelection();
-    fillFloorSelect();
-    renderOverview();
-    renderTenantOptions();
-    renderTenants();
-    renderDocuments();
-    renderMessages();
-    renderNotices();
-    renderTickets();
-    renderPaymentSummary();
-    renderBillingTenantSelection();
-    renderPaymentList();
-
-    if (visibleTenantId) {
-      try {
-        const detail = await fetchJson(`/api/admin/tenants/${encodeURIComponent(visibleTenantId)}/details`);
-        if (requestId !== loadAllDataRequestId) {
+      function setLedgerMonthKeyFromSelectors(context = 'payment') {
+        const monthValue = Number(document.getElementById(`${context}MonthSelect`).value || 0);
+        const yearValue = Number(document.getElementById(`${context}YearSelect`).value || 0);
+        if (!monthValue || !yearValue) {
           return;
         }
-        state.tenantDetail = detail;
-        renderTenantDetail();
-      } catch (error) {
-        if (requestId !== loadAllDataRequestId) {
+        state.ledger.month_key = `${yearValue}-${String(monthValue).padStart(2, '0')}`;
+      }
+
+      function setOverviewMonthKeyFromSelectors() {
+        const monthValue = Number(document.getElementById('overviewMonthSelect').value || 0);
+        const yearValue = Number(document.getElementById('overviewYearSelect').value || 0);
+        if (!monthValue || !yearValue) {
           return;
         }
-        closeTenantDetail();
-        setStatus(error.message, true);
+        state.overviewMonthKey = `${yearValue}-${String(monthValue).padStart(2, '0')}`;
       }
-    }
 
-    if (payload.failures?.length) {
-      setStatus(`Some admin sections could not be loaded: ${payload.failures.join(", ")}.`, true);
-    } else {
-      setStatus("", false);
-    }
-  })();
-  loadAllDataPromise = promise;
-
-  try {
-    return await promise;
-  } finally {
-    if (loadAllDataPromise === promise) {
-      loadAllDataPromise = null;
-    }
-  }
-}
-
-async function refreshAdminData({ silent = true, force = false } = {}) {
-  if (!force && (document.hidden || shouldPauseAutoRefresh())) {
-    return;
-  }
-
-  try {
-    await loadAllData({ force });
-    if (!silent) {
-      setStatus("Admin data refreshed.", false);
-    }
-  } catch (error) {
-    if (silent) {
-      console.error("Admin auto-refresh failed:", error);
-      return;
-    }
-    setStatus(error.message, true);
-  }
-}
-
-function startAdminAutoRefresh() {
-  if (adminAutoRefreshTimer) {
-    clearInterval(adminAutoRefreshTimer);
-  }
-  adminAutoRefreshTimer = window.setInterval(() => {
-    refreshAdminData({ silent: true });
-  }, AUTO_REFRESH_INTERVAL_MS);
-}
-
-function stopAdminAutoRefresh() {
-  if (!adminAutoRefreshTimer) return;
-  clearInterval(adminAutoRefreshTimer);
-  adminAutoRefreshTimer = null;
-}
-async function createUser(event) {
-  event.preventDefault();
-  const payload = {
-    first_name: document.getElementById("firstName").value.trim(),
-    last_name: document.getElementById("lastName").value.trim(),
-    account_number: document.getElementById("accountNumber").value.trim(),
-    floor_number: document.getElementById("floorNumber").value.trim(),
-    house_number: document.getElementById("houseNumber").value.trim(),
-    phone_number: document.getElementById("phoneNumber").value.trim(),
-    rent: document.getElementById("rent").value.trim(),
-    bill: document.getElementById("waterBill").value.trim(),
-    trash_balance: document.getElementById("trashBill").value.trim(),
-    electricity_balance: document.getElementById("electricityBill").value.trim(),
-    deposit: document.getElementById("deposit").value.trim(),
-  };
-
-  if (!payload.first_name || !payload.account_number) {
-    throw new Error("First name and account number are required before creating a tenant.");
-  }
-
-  await fetchJson("/api/admin/users", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  document.getElementById("createUserForm").reset();
-  await loadAllData({ force: true });
-  setStatus(`Tenant created in ${currentPropertyName()}.`, false);
-}
-
-async function saveTenantBilling(event) {
-  event.preventDefault();
-  const form = event.target.closest(".tenantBillingForm");
-  const tenantId = form?.dataset.tenant;
-  if (!tenantId) {
-    throw new Error("Tenant billing form is missing the tenant reference.");
-  }
-
-  const payload = Object.fromEntries(new FormData(form).entries());
-  const resetAccountBalance = payload.reset_account_balance === "true";
-  await fetchJson(`/api/admin/tenants/${encodeURIComponent(tenantId)}/billing`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  await loadAllData({ force: true });
-  setStatus(
-    resetAccountBalance ? "Tenant account values updated and balance reset to 0." : "Tenant account values updated.",
-    false
-  );
-}
-
-async function applyBulkTenantBalanceAction(action) {
-  const normalizedAction = String(action || "").trim().toLowerCase();
-  if (!state.users.length) {
-    throw new Error(`No tenants are available in ${currentPropertyName()}.`);
-  }
-
-  const confirmations = {
-    reset: `Reset every tenant balance in ${currentPropertyName()} to 0?`,
-    rent_due: `Replace every tenant balance in ${currentPropertyName()} with that tenant's rent amount only?`,
-  };
-  if (!confirm(confirmations[normalizedAction] || "Apply this bulk balance action?")) {
-    return;
-  }
-
-  const result = await fetchJson("/api/admin/tenants/balances/bulk", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: normalizedAction }),
-  });
-
-  await loadAllData({ force: true });
-  setStatus(
-    normalizedAction === "reset"
-      ? `All tenant balances were reset to 0 for ${currentPropertyName()}.`
-      : `All tenant balances were replaced with each tenant's rent amount in ${currentPropertyName()}.`,
-    false
-  );
-  return result;
-}
-
-async function sendMessage(event) {
-  event.preventDefault();
-  await fetchJson("/api/admin/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tenant_id: document.getElementById("messageTenant").value,
-      sender_name: document.getElementById("messageSender").value.trim(),
-      category: document.getElementById("messageCategory").value.trim(),
-      subject: document.getElementById("messageSubject").value.trim(),
-      body: document.getElementById("messageBody").value.trim(),
-    }),
-  });
-  document.getElementById("messageSubject").value = "";
-  document.getElementById("messageBody").value = "";
-  await loadAllData({ force: true });
-  setStatus("System message sent.", false);
-}
-
-async function uploadSharedDocument(event) {
-  event.preventDefault();
-  const fileInput = document.getElementById("sharedDocumentFile");
-  const file = fileInput.files?.[0];
-  if (!file) {
-    throw new Error("Choose a file before uploading.");
-  }
-
-  const formData = new FormData();
-  formData.append("name", document.getElementById("sharedDocumentName").value.trim());
-  formData.append("category", document.getElementById("sharedDocumentCategory").value.trim());
-  formData.append("status", document.getElementById("sharedDocumentStatus").value);
-  formData.append("file", file);
-
-  const response = await fetch("/api/admin/documents/shared", {
-    method: "POST",
-    body: formData,
-  });
-
-  if (response.status === 401) {
-    window.location.href = "/secure-admin/login";
-    throw new Error("Admin session expired");
-  }
-
-  const type = response.headers.get("content-type") || "";
-  if (!type.includes("application/json")) {
-    throw new Error("Expected JSON from document upload");
-  }
-
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || "Document upload failed");
-  }
-
-  document.getElementById("sharedDocumentForm").reset();
-  document.getElementById("sharedDocumentCategory").value = "General";
-  document.getElementById("sharedDocumentStatus").value = "AVAILABLE";
-  await loadAllData({ force: true });
-  setStatus(`Shared document uploaded for ${currentPropertyName()} tenants.`, false);
-}
-
-async function savePaymentTargets(event) {
-  event.preventDefault();
-  await fetchJson("/api/admin/payments/targets", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      expected_collection_total: document.getElementById("expectedCollection").value,
-      acquired_collection_total: document.getElementById("acquiredCollection").value,
-    }),
-  });
-  await loadAllData({ force: true });
-  setStatus("Payment totals saved.", false);
-}
-
-async function saveBillingConfig(event) {
-  event.preventDefault();
-  if (!state.billingSelection.length) {
-    throw new Error("Select at least one tenant before applying bill values.");
-  }
-
-  const result = await fetchJson("/api/admin/payments/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      rent: document.getElementById("billingRent").value,
-      water: document.getElementById("billingWater").value,
-      trash: document.getElementById("billingTrash").value,
-      electricity: document.getElementById("billingElectricity").value,
-      tenant_ids: state.billingSelection,
-    }),
-  });
-
-  await loadAllData({ force: true });
-  setStatus(`Bill values applied to ${result.applied_count || state.billingSelection.length} selected tenant(s).`, false);
-}
-
-async function saveOccupancy(event) {
-  event.preventDefault();
-  await fetchJson("/api/admin/occupancy", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      occupied_units: document.getElementById("occupiedUnitsInput").value,
-      vacant_units: document.getElementById("vacantUnitsInput").value,
-    }),
-  });
-  await loadAllData({ force: true });
-  setStatus("Occupancy updated.", false);
-}
-
-async function deleteUser(id) {
-  await fetchJson(`/api/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" });
-  await loadAllData({ force: true });
-  setStatus("User deleted.", false);
-}
-
-async function logout() {
-  stopAdminAutoRefresh();
-  clearAdminSessionToken();
-  await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin" });
-  window.location.href = "/secure-admin/login";
-}
-
-document.querySelectorAll(".nav button").forEach((button) =>
-  button.addEventListener("click", () => {
-    switchTab(button.dataset.tab);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  })
-);
-document
-  .getElementById("refreshAllBtn")
-  .addEventListener("click", () => refreshAdminData({ silent: false, force: true }));
-document.getElementById("propertySelect").addEventListener("change", (event) => {
-  switchProperty(event.target.value).catch((error) => setStatus(error.message, true));
-});
-document.getElementById("logoutBtn").addEventListener("click", logout);
-document.getElementById("createUserForm").addEventListener("submit", (event) => createUser(event).catch((error) => setStatus(error.message, true)));
-document.getElementById("sharedDocumentForm").addEventListener("submit", (event) => uploadSharedDocument(event).catch((error) => setStatus(error.message, true)));
-document.getElementById("sendMessageForm").addEventListener("submit", (event) => sendMessage(event).catch((error) => setStatus(error.message, true)));
-document.getElementById("paymentTargetsForm").addEventListener("submit", (event) => savePaymentTargets(event).catch((error) => setStatus(error.message, true)));
-document.getElementById("billingConfigForm").addEventListener("submit", (event) => saveBillingConfig(event).catch((error) => setStatus(error.message, true)));
-document.getElementById("occupancyForm").addEventListener("submit", (event) => saveOccupancy(event).catch((error) => setStatus(error.message, true)));
-document.getElementById("backToTenantsBtn").addEventListener("click", closeTenantDetail);
-document.getElementById("loadMessagesBtn").addEventListener("click", () => loadConversation().catch((error) => setStatus(error.message, true)));
-document.getElementById("tenantFloorFilter").addEventListener("change", renderTenants);
-document.getElementById("tenantSearch").addEventListener("input", renderTenants);
-document.getElementById("messageSenderFilter").addEventListener("change", renderMessages);
-document.getElementById("messageSearch").addEventListener("input", renderMessages);
-document.getElementById("resetAllBalancesBtn").addEventListener("click", () => {
-  applyBulkTenantBalanceAction("reset").catch((error) => setStatus(error.message, true));
-});
-document.getElementById("setAllRentDueBtn").addEventListener("click", () => {
-  applyBulkTenantBalanceAction("rent_due").catch((error) => setStatus(error.message, true));
-});
-document.getElementById("noticeSearch").addEventListener("input", renderNotices);
-document.getElementById("noticeStatusFilter").addEventListener("change", renderNotices);
-document.getElementById("ticketSearch").addEventListener("input", renderTickets);
-document.getElementById("ticketStatusFilter").addEventListener("change", renderTickets);
-document.getElementById("paymentStatusFilter").addEventListener("change", renderPaymentList);
-document.getElementById("paymentSearch").addEventListener("input", renderPaymentList);
-document.getElementById("billingTenantSearch").addEventListener("input", renderBillingTenantSelection);
-document.getElementById("selectAllBillingTenantsBtn").addEventListener("click", () => {
-  setBillingSelection(state.users.map((user) => user.tenant_id).filter(Boolean));
-});
-document.getElementById("clearBillingTenantsBtn").addEventListener("click", () => {
-  setBillingSelection([]);
-});
-document.getElementById("tenantDetail").addEventListener("submit", (event) => {
-  if (!event.target.closest(".tenantBillingForm")) return;
-  saveTenantBilling(event).catch((error) => setStatus(error.message, true));
-});
-document.getElementById("billingTenantSelection").addEventListener("change", (event) => {
-  const checkbox = event.target.closest(".billingTenantCheckbox");
-  if (!checkbox) return;
-  const nextSelection = new Set(state.billingSelection);
-  if (checkbox.checked) {
-    nextSelection.add(checkbox.dataset.tenant);
-  } else {
-    nextSelection.delete(checkbox.dataset.tenant);
-  }
-  setBillingSelection([...nextSelection]);
-});
-document.getElementById("tenantCards").addEventListener("click", async (event) => {
-  const openButton = event.target.closest(".openTenantBtn");
-  const deleteButton = event.target.closest(".deleteBtn");
-
-  if (deleteButton) {
-    try {
-      if (confirm(`Delete user ${deleteButton.dataset.tenant}?`)) {
-        await deleteUser(deleteButton.dataset.tenant);
+      function renderOverviewMonthControls() {
+        const [currentYear, currentMonth] = String(state.overviewMonthKey).split('-').map(Number);
+        const monthOptions = Array.from({ length: 12 }, (_, index) => {
+          const monthValue = index + 1;
+          const label = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(currentYear || new Date().getUTCFullYear(), index, 1)));
+          return `<option value="${monthValue}" ${monthValue === currentMonth ? 'selected' : ''}>${label}</option>`;
+        }).join('');
+        const yearNow = new Date().getFullYear();
+        const yearOptions = Array.from({ length: 9 }, (_, idx) => yearNow - 3 + idx)
+          .map((yearValue) => `<option value="${yearValue}" ${yearValue === currentYear ? 'selected' : ''}>${yearValue}</option>`)
+          .join('');
+        document.getElementById('overviewMonthSelect').innerHTML = monthOptions;
+        document.getElementById('overviewYearSelect').innerHTML = yearOptions;
       }
-    } catch (error) {
-      setStatus(error.message, true);
-    }
-    return;
-  }
 
-  if (openButton) {
-    try {
-      await loadTenantDetail(openButton.dataset.tenant);
-      setStatus("Tenant record loaded.", false);
-    } catch (error) {
-      setStatus(error.message, true);
-    }
-  }
-});
-document.getElementById("noticeList").addEventListener("click", async (event) => {
-  const button = event.target.closest(".noticeReviewBtn");
-  if (!button) return;
-  try {
-    await fetchJson(`/api/admin/vacating-notices/${button.dataset.id}/review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: button.dataset.status }),
-    });
-    await loadAllData({ force: true });
-    setStatus("Vacating notice reviewed.", false);
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
-document.getElementById("ticketList").addEventListener("click", async (event) => {
-  const button = event.target.closest(".ticketStatusBtn");
-  if (!button) return;
-  try {
-    const payload = { status: button.dataset.status };
-    if (button.dataset.status === "Solved") {
-      const repairCost = window.prompt(
-        `Enter the repair cost for "${button.dataset.title || "this ticket"}" in KES:`,
-        button.dataset.repairCost || "0"
-      );
-      if (repairCost === null) {
-        return;
+      function setStatus(message, isError = false) {
+        if (statusTimerId) {
+          clearTimeout(statusTimerId);
+          statusTimerId = null;
+        }
+        statusEl.textContent = message;
+        statusEl.className = `status ${isError ? 'error' : 'success'}`;
+        const duration = isError ? 6000 : 3500;
+        statusTimerId = setTimeout(() => {
+          statusEl.textContent = '';
+          statusEl.className = 'status';
+          statusTimerId = null;
+        }, duration);
       }
-      payload.repair_cost = repairCost.trim() || "0";
-    }
 
-    await fetchJson(`/api/admin/tickets/${button.dataset.id}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    await loadAllData({ force: true });
-    setStatus(
-      button.dataset.status === "Solved"
-        ? "Ticket solved, repair cost saved, and cleared from the open list."
-        : "Ticket moved to in progress.",
-      false
-    );
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
-document.getElementById("paymentList").addEventListener("click", async (event) => {
-  const button = event.target.closest(".paymentReviewBtn");
-  if (!button) return;
-  try {
-    await fetchJson(`/api/admin/payments/${button.dataset.id}/review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: button.dataset.status }),
-    });
-    await loadAllData({ force: true });
-    setStatus(`Payment ${button.dataset.status === "APPROVED" ? "approved" : "disapproved"}.`, false);
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-});
+      function showLoading(show) {
+        loadingOverlay.classList.toggle('visible', show);
+      }
 
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) {
-    refreshAdminData({ silent: true, force: true });
-  }
-});
+      function currentUsers() {
+        return state.bootstrap?.users?.users || [];
+      }
 
-loadAllData()
-  .then(() => startAdminAutoRefresh())
-  .catch((error) => {
-    identityEl.textContent = "Session check failed";
-    setStatus(error.message, true);
-  });
-</script>
-</body>
+      function currentDocuments() {
+        return state.bootstrap?.documents?.documents || [];
+      }
+
+      function roleName() {
+        return state.session?.role === 'SUPER_ADMIN' ? 'Super Admin' : `${propertyName()} Admin`;
+      }
+
+      function propertyName() {
+        const name = state.session?.selected_property?.name || 'Otic 1';
+        return name.toUpperCase();
+      }
+
+      function ordinalLabel(value) {
+        const number = Number(value);
+        if (Number.isNaN(number)) return value;
+        if (number === 0) return 'Ground Floor';
+        if (number === 1) return 'First Floor';
+        if (number === 2) return 'Second Floor';
+        if (number === 3) return 'Third Floor';
+        const remainder10 = number % 10;
+        const remainder100 = number % 100;
+        const suffix = remainder10 === 1 && remainder100 !== 11 ? 'st' : remainder10 === 2 && remainder100 !== 12 ? 'nd' : remainder10 === 3 && remainder100 !== 13 ? 'rd' : 'th';
+        return `${number}${suffix} Floor`;
+      }
+
+      function formatFloorLabel(value) {
+        const normalized = String(value || '').trim();
+        if (!normalized) return 'Unassigned';
+        if (/^(g|gf|ground|ground floor)$/i.test(normalized) || normalized === '0') return 'Ground Floor';
+        if (/^\d+$/.test(normalized)) return ordinalLabel(Number(normalized));
+        return normalized;
+      }
+
+      function shiftMonth(monthKey, delta) {
+        const [yearPart, monthPart] = String(monthKey).split('-').map(Number);
+        const date = new Date(Date.UTC(yearPart, monthPart - 1, 1));
+        date.setUTCMonth(date.getUTCMonth() + delta);
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+      }
+
+      function computeDues(openingBalance, deposit, waterBill, garbageAmount, rentBill) {
+        const charges = Number(deposit || 0) + Number(waterBill || 0) + Number(garbageAmount || 0) + Number(rentBill || 0);
+        if (openingBalance < 0) return charges + Math.abs(openingBalance);
+        if (openingBalance > 0) return charges - openingBalance;
+        return charges;
+      }
+
+      async function api(path, options = {}) {
+        const init = { method: options.method || 'GET', credentials: 'same-origin', headers: { ...(options.headers || {}) } };
+        if (options.body instanceof FormData) {
+          init.body = options.body;
+        } else if (options.body !== undefined) {
+          init.headers['Content-Type'] = 'application/json';
+          init.body = JSON.stringify(options.body);
+        }
+
+        const response = await fetch(path, init);
+        if (response.status === 401) {
+          window.location.href = '/secure-admin/login';
+          throw new Error('Unauthorized');
+        }
+
+        const text = await response.text();
+        const payload = text ? (() => {
+          try { return JSON.parse(text); } catch { return text; }
+        })() : null;
+
+        if (!response.ok) {
+          throw new Error(payload?.error || response.statusText || 'Request failed');
+        }
+
+        return payload;
+      }
+
+      function renderNav() {
+        document.querySelectorAll('.nav-btn').forEach((button) => {
+          button.classList.remove('is-hidden');
+          button.classList.toggle('active', button.dataset.target === state.activePage);
+        });
+      }
+
+      async function setPage(target) {
+        state.activePage = target;
+        pageTitleEl.textContent = {
+          overview: 'Overview',
+          tenants: 'Tenants',
+          alerts: 'Alerts',
+          documents: 'Documents',
+          reports: 'Reports',
+          payment: 'Payment',
+          utilities: 'Utilities',
+        }[target] || 'Overview';
+        document.querySelectorAll('.page').forEach((page) => {
+          page.classList.toggle('active', page.id === `${target}Page`);
+        });
+        renderNav();
+        if (target === 'alerts') {
+          await ensureAlertsLoaded();
+        }
+      }
+
+      function renderTenantFloorOptions() {
+        const floorValues = [...new Set(currentUsers().map((user) => String(user.floor_number || '').trim()).filter(Boolean))]
+          .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+        if (!floorValues.length) {
+          tenantFloorFilter.innerHTML = '<option value="">No floors</option>';
+          state.tenantFloor = '';
+          return;
+        }
+
+        if (!state.tenantFloor || !floorValues.includes(state.tenantFloor)) {
+          state.tenantFloor = floorValues[0];
+        }
+
+        tenantFloorFilter.innerHTML = floorValues.map((floor) => `<option value="${escapeHtml(floor)}">${escapeHtml(formatFloorLabel(floor))}</option>`).join('');
+        tenantFloorFilter.value = state.tenantFloor;
+      }
+
+      function renderPropertySelector() {
+        const properties = state.session?.properties || [];
+        propertySwitcher.classList.toggle('is-hidden', state.session?.role !== 'SUPER_ADMIN');
+        propertySelect.innerHTML = properties.map((property) => `<option value="${escapeHtml(property.id)}">${escapeHtml(property.name)}</option>`).join('');
+        propertySelect.value = state.session?.selected_property?.id || '';
+      }
+
+      function renderOverview() {
+        const overview = state.bootstrap?.overview?.overview || { total_units: 0, occupied_units: 0, vacant_units: 0, overdue_tenants: 0, rent_collection_rate: 0, active_leases: 0 };
+        const stats = state.bootstrap?.overview?.stats || { total_users: 0, total_floors: 0, tenant_messages: 0, pending_notices: 0, open_tickets: 0 };
+        const monthly = state.overviewMonthlySummary?.summary || { dues_total: 0, payment_total: 0, balance_total: 0, tenant_count: 0 };
+        const expected = Number(monthly.dues_total || 0);
+        const collected = Number(monthly.payment_total || 0);
+        const variance = collected - expected;
+        const collectionRate = expected > 0 ? (collected / expected) * 100 : 0;
+
+        document.getElementById('overviewMetrics').innerHTML = [
+          ['Units', overview.total_units],
+          ['Occupied', overview.occupied_units],
+          ['Vacant', overview.vacant_units],
+          ['Tenants', monthly.tenant_count || stats.total_users],
+          ['Expected', formatMoney(expected)],
+          ['Collected', formatMoney(collected)],
+        ].map(([label, value]) => `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`).join('');
+
+        const bars = [
+          ['Occupancy', overview.total_units ? (Number(overview.occupied_units || 0) / Number(overview.total_units || 1)) * 100 : 0],
+          ['Collection', collectionRate],
+          ['Overdue tenants', stats.total_users ? (Number(overview.overdue_tenants || 0) / Math.max(Number(stats.total_users || 1), 1)) * 100 : 0],
+        ];
+        document.getElementById('portfolioBars').innerHTML = bars.map(([label, value]) => `<div class="bar-row"><span>${label}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Number(value || 0))}%"></div></div><strong>${Math.round(Number(value || 0))}%</strong></div>`).join('');
+        document.getElementById('collectionMix').innerHTML = [
+          ['Expected', 100],
+          ['Collected', collectionRate],
+          ['Variance', expected ? (Math.abs(variance) / expected) * 100 : 0],
+        ].map(([label, value]) => `<div class="bar-row"><span>${label}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, Number(value || 0))}%"></div></div><strong>${Math.round(Number(value || 0))}%</strong></div>`).join('');
+
+        document.getElementById('performanceChart').innerHTML = `
+          <defs>
+            <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#1f4d7a" stop-opacity="0.30" />
+              <stop offset="100%" stop-color="#1f4d7a" stop-opacity="0.02" />
+            </linearGradient>
+          </defs>
+          <polyline fill="url(#lineFill)" points="20,160 116,140 212,130 308,90 404,84 480,60 480,200 20,200" stroke="none"></polyline>
+          <polyline fill="none" stroke="#1f4d7a" stroke-width="3" points="20,160 116,140 212,130 308,90 404,84 480,60"></polyline>
+        `;
+
+        document.getElementById('portfolioLabel').textContent = propertyName();
+        document.getElementById('trendBadge').textContent = propertyName();
+        document.getElementById('mixBadge').textContent = propertyName();
+        document.getElementById('occupiedUnitsInput').value = Number(overview.occupied_units || 0);
+        document.getElementById('vacantUnitsInput').value = Number(overview.vacant_units || 0);
+      }
+
+      function renderTenantTable() {
+        const searchValue = state.tenantSearch.trim().toLowerCase();
+        const users = currentUsers().filter((tenant) => {
+          const floorValue = String(tenant.floor_number || '').trim();
+          if (state.tenantFloor && floorValue !== state.tenantFloor) {
+            return false;
+          }
+          const matchText = `${tenant.first_name || ''} ${tenant.last_name || ''} ${tenant.tenant_id || ''} ${tenant.house_number || ''} ${tenant.phone_number || ''}`.toLowerCase();
+          const matchesSearch = !searchValue || matchText.includes(searchValue);
+          return matchesSearch;
+        });
+
+        document.getElementById('tenantBadge').textContent = propertyName();
+        document.getElementById('tenantTableBody').innerHTML = users.length
+          ? users.map((tenant) => {
+              const name = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.first_name || 'Tenant';
+              return `<tr class="tenant-row" data-tenant-id="${escapeHtml(tenant.tenant_id || '')}"><td>${escapeHtml(name)}</td><td>${escapeHtml(formatFloorLabel(tenant.floor_number || '-'))}</td><td>${escapeHtml(tenant.house_number || '-')}</td><td>${escapeHtml(tenant.phone_number || '-')}</td><td>${formatMoney(tenant.rent_balance || tenant.rent || 0)}</td><td>${formatMoney(tenant.deposit || 0)}</td></tr>`;
+            }).join('')
+          : '<tr><td colspan="6">No tenants found on the selected floor.</td></tr>';
+      }
+
+      function updateTenantInState(updatedUser) {
+        if (!state.bootstrap?.users?.users) {
+          return;
+        }
+        state.bootstrap.users.users = state.bootstrap.users.users.map((tenant) =>
+          String(tenant.tenant_id || '') === String(updatedUser.tenant_id || '') ? updatedUser : tenant
+        );
+      }
+
+      function renderTenantDrawer() {
+        const detail = state.activeTenantDetail;
+        if (!detail?.tenant) {
+          document.getElementById('tenantDrawerTitle').textContent = 'Tenant details';
+          document.getElementById('tenantDrawerContent').innerHTML = '<div class="empty-state">Tenant details unavailable.</div>';
+          return;
+        }
+
+        const tenant = detail.tenant;
+        const bills = detail.bills || {};
+        const summary = detail.summary || {};
+        const name = `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || tenant.first_name || 'Tenant';
+        document.getElementById('tenantDrawerTitle').textContent = name;
+        document.getElementById('tenantDrawerContent').innerHTML = `
+          <div class="fullscreen-layout">
+            <div class="detail-stack">
+              <div class="detail-grid">
+                <div class="detail-box"><strong>Tenant ID</strong><span>${escapeHtml(tenant.tenant_id || '-')}</span></div>
+                <div class="detail-box"><strong>Property</strong><span>${escapeHtml(tenant.property_name || '-')}</span></div>
+                <div class="detail-box"><strong>Balance</strong><span>${formatMoney(tenant.account_balance || 0)}</span></div>
+                <div class="detail-box"><strong>Rent Due</strong><span>${formatMoney(bills.rent || tenant.rent || 0)}</span></div>
+                <div class="detail-box"><strong>Water</strong><span>${formatMoney(bills.water || 0)}</span></div>
+                <div class="detail-box"><strong>Trash</strong><span>${formatMoney(bills.trash || 0)}</span></div>
+              </div>
+              <div class="detail-grid">
+                <div class="detail-box"><strong>Unread messages</strong><span>${Number(summary.unread_messages || 0)}</span></div>
+                <div class="detail-box"><strong>Open tickets</strong><span>${Number(summary.open_tickets || 0)}</span></div>
+                <div class="detail-box"><strong>Pending notices</strong><span>${Number(summary.pending_notices || 0)}</span></div>
+                <div class="detail-box"><strong>Pending payments</strong><span>${Number(summary.pending_payments || 0)}</span></div>
+              </div>
+            </div>
+            <div>
+              <form id="tenantDetailForm" data-tenant-id="${escapeHtml(tenant.tenant_id || '')}">
+                <div class="tenant-editor-grid">
+                  <label class="field-stack"><span>First name</span><input class="text-input" data-tenant-edit-field="first_name" type="text" value="${escapeHtml(tenant.first_name || '')}" /></label>
+                  <label class="field-stack"><span>Last name</span><input class="text-input" data-tenant-edit-field="last_name" type="text" value="${escapeHtml(tenant.last_name || '')}" /></label>
+                  <label class="field-stack"><span>Floor</span><input class="text-input" data-tenant-edit-field="floor_number" type="text" value="${escapeHtml(tenant.floor_number || '')}" /></label>
+                  <label class="field-stack"><span>Unit number</span><input class="text-input" data-tenant-edit-field="house_number" type="text" value="${escapeHtml(tenant.house_number || '')}" /></label>
+                  <label class="field-stack"><span>Phone number</span><input class="text-input" data-tenant-edit-field="phone_number" type="text" value="${escapeHtml(tenant.phone_number || '')}" /></label>
+                  <label class="field-stack"><span>Email</span><input class="text-input" data-tenant-edit-field="email_address" type="email" value="${escapeHtml(tenant.email_address || '')}" /></label>
+                  <label class="field-stack"><span>National ID</span><input class="text-input" data-tenant-edit-field="national_id" type="text" value="${escapeHtml(tenant.national_id || '')}" /></label>
+                  <label class="field-stack"><span>Rent</span><input class="money-input" data-tenant-edit-field="rent" type="number" min="0" step="0.01" value="${escapeHtml(tenant.rent || 0)}" /></label>
+                  <label class="field-stack"><span>Deposit</span><input class="money-input" data-tenant-edit-field="deposit" type="number" min="0" step="0.01" value="${escapeHtml(tenant.deposit || 0)}" /></label>
+                </div>
+              </form>
+              <div class="drawer-actions">
+                <button id="saveTenantDetailBtn" class="secondary-btn" type="button">Save tenant</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      async function openTenantDrawer(tenantId) {
+        if (!tenantId) return;
+        showLoading(true);
+        try {
+          state.activeTenantDetail = await api(`/api/admin/tenants/${encodeURIComponent(tenantId)}/details`);
+          renderTenantDrawer();
+          drawerBackdrop.classList.add('visible');
+          drawer.classList.add('open');
+        } catch (error) {
+          setStatus(error.message || 'Unable to load tenant details.', true);
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      function closeTenantDrawer() {
+        state.activeTenantDetail = null;
+        drawer.classList.remove('open');
+        drawerBackdrop.classList.remove('visible');
+      }
+
+      function renderAlerts() {
+        const threadPicker = document.getElementById('alertsThreadPicker');
+        const threadSelect = document.getElementById('alertsThreadSelect');
+        const history = document.getElementById('alertsHistory');
+        const context = document.getElementById('alertsContext');
+        const currentThread = (state.alerts.threads || []).find((thread) => Number(thread.thread_owner_admin_user_id) === Number(state.alerts.current_thread_owner_admin_user_id)) || null;
+        const isSuperAdmin = state.session?.role === 'SUPER_ADMIN';
+
+        threadPicker.hidden = !isSuperAdmin;
+        if (isSuperAdmin) {
+          threadSelect.innerHTML = (state.alerts.threads || []).map((thread) => `<option value="${thread.thread_owner_admin_user_id}">${escapeHtml(thread.owner_full_name || thread.owner_username || 'Property Admin')} • ${escapeHtml(thread.property_name || 'OTIC')}</option>`).join('');
+          threadSelect.value = state.alerts.current_thread_owner_admin_user_id || '';
+        }
+
+        if (currentThread) {
+          context.textContent = isSuperAdmin
+            ? `You are viewing the private thread for ${currentThread.owner_full_name || currentThread.owner_username} (${currentThread.property_name || 'OTIC'}).`
+            : 'Only you and the superadmin can view this thread.';
+        } else {
+          context.textContent = isSuperAdmin ? 'Select a property-admin thread to view or reply.' : 'Only you and the superadmin can view this thread.';
+        }
+
+        history.innerHTML = (state.alerts.messages || []).length
+          ? state.alerts.messages.map((message) => {
+              const isSelf = Number(message.sender_admin_user_id || 0) === Number(state.session?.admin_user_id || 0);
+              return `
+                <article class="alert-bubble ${isSelf ? 'is-self' : ''}">
+                  <div class="alert-meta">
+                    <strong>${escapeHtml(message.sender_name || message.sender_full_name || 'Admin')}</strong>
+                    <span>${escapeHtml(formatDateTime(message.created_at))}</span>
+                  </div>
+                  <div class="alert-body">${escapeHtml(message.body || '')}</div>
+                </article>
+              `;
+            }).join('')
+          : '<div class="empty-state">No alerts in this thread yet.</div>';
+
+        document.getElementById('sendAlertBtn').disabled = isSuperAdmin && !currentThread;
+      }
+
+      async function refreshAlerts(preferredThreadOwnerAdminUserId = state.alerts.current_thread_owner_admin_user_id) {
+        const query = new URLSearchParams();
+        if (preferredThreadOwnerAdminUserId) {
+          query.set('thread_owner_admin_user_id', preferredThreadOwnerAdminUserId);
+        }
+        const payload = await api(`/api/admin/alerts${query.toString() ? `?${query.toString()}` : ''}`);
+        state.alerts = {
+          ...payload,
+          loaded: true,
+        };
+        renderAlerts();
+      }
+
+      async function ensureAlertsLoaded(force = false) {
+        if (force || !state.alerts.loaded) {
+          await refreshAlerts();
+          return;
+        }
+        renderAlerts();
+      }
+
+      function renderDocuments() {
+        const documents = currentDocuments();
+        document.getElementById('documentBadge').textContent = propertyName();
+        document.getElementById('documentList').innerHTML = documents.length
+          ? documents.map((doc) => `
+              <div class="document-item">
+                <div class="doc-thumb">${escapeHtml((doc.name || 'Doc').slice(0, 2).toUpperCase())}</div>
+                <div style="flex:1;">
+                  <strong>${escapeHtml(doc.name || 'Document')}</strong><br />
+                  <small>${escapeHtml(doc.category || 'General')} • ${escapeHtml(doc.status || 'AVAILABLE')}</small>
+                </div>
+                <button type="button" class="secondary-btn js-preview-doc" data-doc-id="${doc.id}">Preview</button>
+              </div>
+            `).join('')
+          : '<div class="empty-state">No shared documents uploaded yet.</div>';
+      }
+
+      function renderPreview(doc) {
+        const previewPane = document.getElementById('docPreview');
+        if (!doc?.url) {
+          previewPane.innerHTML = '<div>Select a document to preview.</div>';
+          return;
+        }
+
+        if (/\.(png|jpe?g|gif|webp|svg)$/i.test(doc.url)) {
+          previewPane.innerHTML = `<img src="${doc.url}" alt="${escapeHtml(doc.name || 'Document')}" />`;
+          return;
+        }
+
+        if (/\.pdf$/i.test(doc.url)) {
+          previewPane.innerHTML = `<iframe src="${doc.url}" title="${escapeHtml(doc.name || 'Document')}"></iframe>`;
+          return;
+        }
+
+        previewPane.innerHTML = `<div><h3>${escapeHtml(doc.name || 'Document')}</h3><p>Preview unavailable for this file type.</p><a href="${doc.url}" target="_blank" rel="noreferrer" style="color: var(--primary); font-weight:700;">Open file</a></div>`;
+      }
+
+      function renderReports() {
+        const summary = state.reports?.summary || {};
+        const rows = state.reports?.data?.tenant_rows || [];
+        const totalRent = rows.reduce((sum, row) => sum + Number(row.rent || 0), 0);
+        const totalBalance = rows.reduce((sum, row) => sum + Number(row.balance || 0), 0);
+        const totalArrears = rows.reduce((sum, row) => sum + Number(row.arrears || 0), 0);
+        const meaningfulExpected = rows.length ? Number(summary.expected_collection || totalRent || 0) : 0;
+        const meaningfulCollected = rows.length ? Number(summary.acquired_collection || 0) : 0;
+        const meaningfulVariance = meaningfulCollected - meaningfulExpected;
+        const occupancyRate = Number(summary.occupancy_rate || 0);
+        const collectionRate = meaningfulExpected > 0 ? (meaningfulCollected / meaningfulExpected) * 100 : 0;
+        document.getElementById('reportMetrics').innerHTML = [
+          ['Expected', formatMoney(meaningfulExpected)],
+          ['Collected', formatMoney(meaningfulCollected)],
+          ['Variance', formatMoney(meaningfulVariance)],
+          ['Collection rate', `${collectionRate.toFixed(1)}%`],
+          ['Occupancy rate', `${occupancyRate.toFixed(1)}%`],
+          ['Vacant units', Number(summary.vacant_units || 0)],
+        ].map(([label, value]) => `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`).join('');
+
+        document.getElementById('reportTable').innerHTML = [
+          ['Total tenants', rows.length || summary.total_tenants || 0],
+          ['Total units', summary.total_units || 0],
+          ['Occupied units', summary.occupied_units || 0],
+          ['Vacant units', summary.vacant_units || 0],
+          ['Total rent billed', formatMoney(totalRent)],
+          ['Total arrears', formatMoney(totalArrears)],
+          ['Net balance', formatMoney(totalBalance)],
+        ].map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join('');
+
+      }
+
+      function renderLedgerControls() {
+        document.getElementById('paymentPropertyBadge').textContent = propertyName();
+        document.getElementById('utilitiesPropertyBadge').textContent = propertyName();
+        const { year, month } = getLedgerMonthParts();
+        const monthOptions = Array.from({ length: 12 }, (_, index) => {
+          const monthValue = index + 1;
+          const dateLabel = new Date(Date.UTC(year || new Date().getUTCFullYear(), index, 1));
+          const label = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(dateLabel);
+          return `<option value="${monthValue}" ${monthValue === month ? 'selected' : ''}>${label}</option>`;
+        }).join('');
+        const currentYear = new Date().getFullYear();
+        const years = Array.from({ length: 9 }, (_, idx) => currentYear - 3 + idx);
+        const yearOptions = years.map((item) => `<option value="${item}" ${item === year ? 'selected' : ''}>${item}</option>`).join('');
+
+        ['payment', 'utilities'].forEach((context) => {
+          document.getElementById(`${context}MonthSelect`).innerHTML = monthOptions;
+          document.getElementById(`${context}YearSelect`).innerHTML = yearOptions;
+          const floorSelect = document.getElementById(`${context}FloorSelect`);
+          floorSelect.innerHTML = state.ledger.floors.length
+            ? ['<option value="" ' + (!state.ledger.selected_floor ? 'selected' : '') + '>All Floors</option>', ...state.ledger.floors.map((floor) => `<option value="${escapeHtml(floor)}" ${floor === state.ledger.selected_floor ? 'selected' : ''}>${escapeHtml(formatFloorLabel(floor))}</option>`)].join('')
+            : '<option value="">No floors</option>';
+        });
+
+        document.getElementById('waterRateInput').value = Number(state.ledger.water_rate || 0);
+      }
+
+      function renderPaymentPage() {
+        renderLedgerControls();
+        const summary = state.ledger.summary || { tenant_count: 0, dues_total: 0, payment_total: 0, balance_total: 0, water_total: 0, garbage_total: 0 };
+        document.getElementById('paymentSummary').innerHTML = [
+          ['Tenants', summary.tenant_count],
+          ['Dues', formatMoney(summary.dues_total)],
+          ['Payments', formatMoney(summary.payment_total)],
+          ['Balance', formatMoney(summary.balance_total)],
+          ['Water', formatMoney(summary.water_total)],
+          ['Garbage', formatMoney(summary.garbage_total)],
+        ].map(([label, value]) => `<div class="summary-card"><strong>${label}</strong><span>${value}</span></div>`).join('');
+
+        const rows = state.ledger.rows || [];
+        document.getElementById('paymentTableBody').innerHTML = rows.length
+          ? rows.map((row) => {
+              const isOpen = Number(state.paymentOpenUserId) === Number(row.user_id);
+              const paymentHistory = row.payment_entries?.length
+                ? row.payment_entries.map((entry) => `<tr><td>${formatDate(entry.payment_date)}</td><td>${formatMoney(entry.amount)}</td><td>${escapeHtml(entry.receipt_number || '—')}</td><td>${escapeHtml(entry.remarks || '—')}</td></tr>`).join('')
+                : '<tr><td colspan="4">No payments recorded for this month.</td></tr>';
+              return `
+                <tr class="payment-statement-row" data-user-id="${row.user_id}" data-water-bill="${row.water_bill}" data-garbage="${row.garbage_amount}" data-payment-total="${row.payment_total}">
+                  <td>${escapeHtml(row.tenant_name)}</td>
+                  <td>${escapeHtml(row.house_number || '-')}</td>
+                  <td><input class="money-input js-payment-preview" data-field="opening_balance_override" type="number" step="0.01" value="${row.opening_balance}" ${row.opening_balance_locked ? 'disabled' : ''} /></td>
+                  <td><input class="money-input js-payment-preview" data-field="deposit" type="number" min="0" step="0.01" value="${row.deposit}" /></td>
+                  <td><div class="cell-stack"><span>${formatMoney(row.water_bill)}</span><span class="hint-text">From Utilities</span></div></td>
+                  <td><div class="cell-stack"><span>${formatMoney(row.garbage_amount)}</span><span class="hint-text">From Utilities</span></div></td>
+                  <td><input class="money-input js-payment-preview" data-field="rent_bill" type="number" min="0" step="0.01" value="${row.rent_bill}" /></td>
+                  <td class="js-dues">${formatMoney(row.dues)}</td>
+                  <td><div class="cell-stack"><strong>${formatMoney(row.payment_total)}</strong><button type="button" class="secondary-btn js-toggle-payments" data-user-id="${row.user_id}">${isOpen ? 'Hide' : 'Payments'}</button></div></td>
+                  <td class="nowrap">${escapeHtml(formatDate(row.latest_payment_date))}</td>
+                  <td>${escapeHtml(row.latest_receipt_number || '—')}</td>
+                  <td class="js-balance">${formatMoney(row.balance)}</td>
+                  <td>
+                    <div class="cell-stack">
+                      <input class="text-input" data-field="remarks" type="text" value="${escapeHtml(row.remarks || '')}" />
+                      <div class="save-inline">
+                        <button type="button" class="secondary-btn js-save-statement" data-user-id="${row.user_id}">Save</button>
+                        <span class="hint-text">Auto-carry from ${escapeHtml(formatMonthLabel(row.previous_month_key))}</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr class="payment-row-detail" ${isOpen ? '' : 'hidden'}>
+                  <td colspan="13">
+                    <div class="detail-card">
+                      <h3>Payment history for ${escapeHtml(row.tenant_name)}</h3>
+                      <div class="table-wrap" style="margin-bottom: 14px;">
+                        <table class="history-table">
+                          <thead><tr><th>Date</th><th>Amount</th><th>Receipt/Reference</th><th>Remarks</th></tr></thead>
+                          <tbody>${paymentHistory}</tbody>
+                        </table>
+                      </div>
+                      <div class="inline-form" data-payment-form-user-id="${row.user_id}">
+                        <label class="compact-stack"><span>Amount</span><input class="money-input" data-payment-field="amount" type="number" min="0" step="0.01" /></label>
+                        <label class="compact-stack"><span>Date (DD/MM/YYYY)</span><input class="text-input" data-payment-field="payment_date" type="text" value="${toDdMmYyyyInput()}" /></label>
+                        <label class="compact-stack"><span>Receipt No.</span><input class="text-input" data-payment-field="receipt_number" type="text" /></label>
+                        <label class="compact-stack"><span>Remarks</span><input class="text-input" data-payment-field="remarks" type="text" /></label>
+                        <button type="button" class="secondary-btn js-record-payment" data-user-id="${row.user_id}">Record payment</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')
+          : '<tr><td colspan="13">No tenants found on the selected floor.</td></tr>';
+      }
+
+      function renderUtilitiesPage() {
+        renderLedgerControls();
+        document.querySelectorAll('[data-utility-tab]').forEach((button) => {
+          button.classList.toggle('active', button.dataset.utilityTab === state.utilityTab);
+        });
+        document.getElementById('waterUtilityPanel').hidden = state.utilityTab !== 'water';
+        document.getElementById('garbageUtilityPanel').hidden = state.utilityTab !== 'garbage';
+
+        const rows = state.ledger.rows || [];
+        document.getElementById('waterTableBody').innerHTML = rows.length
+          ? rows.map((row) => `
+              <tr data-water-user-id="${row.user_id}">
+                <td>${escapeHtml(row.tenant_name)}</td>
+                <td>${escapeHtml(row.house_number || '-')}</td>
+                <td><input class="money-input js-water-preview" data-water-field="previous_reading" type="number" min="0" step="0.01" value="${row.previous_meter_reading}" /></td>
+                <td><input class="money-input js-water-preview" data-water-field="latest_reading" type="number" min="0" step="0.01" value="${row.latest_meter_reading}" /></td>
+                <td class="js-water-consumption">${row.consumption}</td>
+                <td><input class="money-input" data-water-field="rate" type="number" min="0" step="0.01" value="${row.rate}" disabled /></td>
+                <td>
+                  <div class="cell-stack">
+                    <strong class="js-water-bill">${formatMoney(row.water_bill)}</strong>
+                    <button type="button" class="secondary-btn js-save-water" data-user-id="${row.user_id}">Save water</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')
+          : '<tr><td colspan="7">No tenants found on the selected floor.</td></tr>';
+
+        document.getElementById('garbageTableBody').innerHTML = rows.length
+          ? rows.map((row) => `
+              <tr data-garbage-user-id="${row.user_id}">
+                <td>${escapeHtml(row.tenant_name)}</td>
+                <td>${escapeHtml(row.house_number || '-')}</td>
+                <td>
+                  <div class="inline-form" style="grid-template-columns: minmax(120px, 180px) auto;">
+                    <input class="money-input" data-garbage-field="amount" type="number" min="0" step="0.01" value="${row.garbage_amount}" />
+                    <button type="button" class="secondary-btn js-apply-garbage-tenant" data-user-id="${row.user_id}">Add to Tenant</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')
+          : '<tr><td colspan="3">No tenants found on the selected floor.</td></tr>';
+      }
+
+      function updatePaymentRowPreview(rowElement) {
+        const openingInput = rowElement.querySelector('[data-field="opening_balance_override"]');
+        const depositInput = rowElement.querySelector('[data-field="deposit"]');
+        const rentInput = rowElement.querySelector('[data-field="rent_bill"]');
+        const opening = Number(openingInput?.value || 0);
+        const deposit = Number(depositInput?.value || 0);
+        const waterBill = Number(rowElement.dataset.waterBill || 0);
+        const garbageAmount = Number(rowElement.dataset.garbage || 0);
+        const rentBill = Number(rentInput?.value || 0);
+        const paymentTotal = Number(rowElement.dataset.paymentTotal || 0);
+        const dues = computeDues(opening, deposit, waterBill, garbageAmount, rentBill);
+        const balance = paymentTotal - dues;
+        rowElement.querySelector('.js-dues').textContent = formatMoney(dues);
+        rowElement.querySelector('.js-balance').textContent = formatMoney(balance);
+      }
+
+      function updateWaterRowPreview(rowElement) {
+        const previous = Number(rowElement.querySelector('[data-water-field="previous_reading"]').value || 0);
+        const latest = Number(rowElement.querySelector('[data-water-field="latest_reading"]').value || 0);
+        const rate = Number(state.ledger.water_rate || 0);
+        const consumption = latest - previous;
+        const bill = consumption * rate;
+        rowElement.querySelector('.js-water-consumption').textContent = `${consumption}`;
+        rowElement.querySelector('.js-water-bill').textContent = formatMoney(bill);
+      }
+
+      async function refreshLedger() {
+        const query = new URLSearchParams({ month: state.ledger.month_key });
+        if (state.ledger.selected_floor) {
+          query.set('floor', state.ledger.selected_floor);
+        }
+        const payload = await api(`/api/admin/payments/statement?${query.toString()}`);
+        state.ledger = {
+          ...payload,
+          month_key: payload.month_key,
+          selected_floor: payload.selected_floor,
+        };
+        renderPaymentPage();
+        renderUtilitiesPage();
+      }
+
+      async function refreshOverviewMonthlySummary() {
+        const query = new URLSearchParams({ month: state.overviewMonthKey });
+        state.overviewMonthlySummary = await api(`/api/admin/payments/statement?${query.toString()}`);
+      }
+
+      async function refreshReports() {
+        state.reports = await api('/api/admin/reports');
+        renderReports();
+      }
+
+      async function loadDashboard() {
+        showLoading(true);
+        try {
+          state.session = await api('/api/admin/session');
+          renderPropertySelector();
+          adminUserEl.textContent = state.session?.full_name || roleName();
+          state.bootstrap = await api('/api/admin/bootstrap');
+          state.alerts = { threads: [], messages: [], current_thread_owner_admin_user_id: null, loaded: false };
+          state.overviewMonthKey = state.ledger.month_key;
+          await Promise.all([refreshOverviewMonthlySummary(), refreshReports(), refreshLedger()]);
+          renderOverviewMonthControls();
+          renderTenantFloorOptions();
+          renderOverview();
+          renderTenantTable();
+          renderDocuments();
+          renderReports();
+          renderNav();
+          await setPage(state.activePage);
+          setStatus(`${propertyName()} data loaded.`);
+        } catch (error) {
+          setStatus(error.message || 'Unable to load the admin console.', true);
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      document.querySelectorAll('.nav-btn').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await setPage(button.dataset.target);
+        });
+      });
+
+      tenantSearch.addEventListener('input', () => {
+        state.tenantSearch = tenantSearch.value;
+        renderTenantTable();
+      });
+
+      tenantFloorFilter.addEventListener('change', () => {
+        state.tenantFloor = tenantFloorFilter.value;
+        renderTenantTable();
+      });
+
+      document.getElementById('resetFilters').addEventListener('click', () => {
+        tenantSearch.value = '';
+        state.tenantSearch = '';
+        renderTenantFloorOptions();
+        renderTenantTable();
+      });
+
+      document.getElementById('addTenantBtn').addEventListener('click', async () => {
+        const name = document.getElementById('newTenantName').value.trim();
+        const floor = document.getElementById('newTenantFloor').value.trim();
+        const unit = document.getElementById('newTenantUnit').value.trim();
+        const rent = Number(document.getElementById('newTenantRent').value || 0);
+        const deposit = Number(document.getElementById('newTenantDeposit').value || 0);
+        const phone = document.getElementById('newTenantPhone').value.trim();
+        if (!name || !floor || !unit || !phone) {
+          setStatus('Fill tenant name, floor, unit number, and phone number.', true);
+          return;
+        }
+
+        const [firstName, ...rest] = name.split(/\s+/);
+        const lastName = rest.join(' ');
+        const accountSeed = `${Date.now()}${Math.floor(Math.random() * 1e3)}`;
+
+        try {
+          await api('/api/admin/users', {
+            method: 'POST',
+            body: {
+              first_name: firstName,
+              last_name: lastName,
+              account_number: `ACC-${accountSeed}`,
+              floor_number: floor,
+              house_number: unit,
+              phone_number: phone,
+              rent: String(rent),
+              deposit: String(deposit),
+            },
+          });
+          await loadDashboard();
+          document.getElementById('newTenantName').value = '';
+          document.getElementById('newTenantFloor').value = '';
+          document.getElementById('newTenantUnit').value = '';
+          document.getElementById('newTenantRent').value = '';
+          document.getElementById('newTenantDeposit').value = '';
+          document.getElementById('newTenantPhone').value = '';
+          setStatus('Tenant added successfully.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to add tenant.', true);
+        }
+      });
+
+      propertySelect.addEventListener('change', async () => {
+        showLoading(true);
+        try {
+          await api('/api/admin/context/property', { method: 'POST', body: { property_id: propertySelect.value } });
+          state.paymentOpenUserId = null;
+          await loadDashboard();
+        } catch (error) {
+          setStatus(error.message || 'Unable to switch property.', true);
+          showLoading(false);
+        }
+      });
+
+      document.getElementById('generateReportBtn').addEventListener('click', async () => {
+        try {
+          state.reports = await api('/api/admin/reports/generate', { method: 'POST' });
+          renderReports();
+          setStatus('Report generated from the live database.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to generate the report.', true);
+        }
+      });
+
+      document.getElementById('uploadDocumentBtn').addEventListener('click', async () => {
+        const fileInput = document.getElementById('docFile');
+        const file = fileInput.files?.[0];
+        if (!file) {
+          setStatus('Select a file before uploading.', true);
+          return;
+        }
+
+        try {
+          const form = new FormData();
+          form.append('name', document.getElementById('docName').value.trim() || file.name);
+          form.append('status', 'AVAILABLE');
+          form.append('file', file);
+          const payload = await api('/api/admin/documents/shared', { method: 'POST', body: form });
+          state.bootstrap.documents.documents = payload.documents || [];
+          renderDocuments();
+          fileInput.value = '';
+          document.getElementById('docFileName').textContent = 'No file selected';
+          document.getElementById('docName').value = '';
+          setStatus('Document uploaded.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to upload the document.', true);
+        }
+      });
+
+      document.getElementById('pickDocFileBtn').addEventListener('click', () => {
+        document.getElementById('docFile').click();
+      });
+
+      document.getElementById('docFile').addEventListener('change', (event) => {
+        const file = event.target.files?.[0];
+        document.getElementById('docFileName').textContent = file ? file.name : 'No file selected';
+      });
+
+      document.getElementById('closeDrawerBtn').addEventListener('click', closeTenantDrawer);
+      drawerBackdrop.addEventListener('click', closeTenantDrawer);
+      document.getElementById('alertsThreadSelect').addEventListener('change', async (event) => {
+        await refreshAlerts(event.target.value);
+      });
+
+      document.getElementById('sendAlertBtn').addEventListener('click', async () => {
+        const messageInput = document.getElementById('alertMessageInput');
+        const body = messageInput.value.trim();
+        if (!body) {
+          setStatus('Type an alert message before sending.', true);
+          return;
+        }
+
+        try {
+          const payload = { body };
+          if (state.session?.role === 'SUPER_ADMIN' && state.alerts.current_thread_owner_admin_user_id) {
+            payload.thread_owner_admin_user_id = state.alerts.current_thread_owner_admin_user_id;
+          }
+          const response = await api('/api/admin/alerts', { method: 'POST', body: payload });
+          state.alerts = { ...response, loaded: true };
+          renderAlerts();
+          messageInput.value = '';
+          setStatus('Alert sent.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to send the alert.', true);
+        }
+      });
+
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        try { await api('/api/admin/logout', { method: 'POST' }); } catch (_) {}
+        window.location.href = '/secure-admin/login';
+      });
+
+      document.body.addEventListener('click', async (event) => {
+        const tenantRow = event.target.closest('.tenant-row');
+        if (tenantRow) {
+          await openTenantDrawer(tenantRow.dataset.tenantId);
+          return;
+        }
+
+        const saveTenantDetailButton = event.target.closest('#saveTenantDetailBtn');
+        if (saveTenantDetailButton) {
+          const form = document.getElementById('tenantDetailForm');
+          if (!form) {
+            setStatus('Tenant detail form is unavailable.', true);
+            return;
+          }
+
+          const tenantId = form.dataset.tenantId;
+          const payload = Object.fromEntries(
+            Array.from(form.querySelectorAll('[data-tenant-edit-field]')).map((input) => [input.dataset.tenantEditField, input.value])
+          );
+
+          try {
+            const response = await api(`/api/admin/users/${encodeURIComponent(tenantId)}`, {
+              method: 'PATCH',
+              body: payload,
+            });
+            updateTenantInState(response.user);
+            renderTenantFloorOptions();
+            renderTenantTable();
+            state.activeTenantDetail = await api(`/api/admin/tenants/${encodeURIComponent(tenantId)}/details`);
+            renderTenantDrawer();
+            await Promise.all([refreshReports(), refreshLedger()]);
+            setStatus('Tenant details saved.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to save tenant details.', true);
+          }
+          return;
+        }
+
+        const previewButton = event.target.closest('.js-preview-doc');
+        if (previewButton) {
+          const doc = currentDocuments().find((item) => String(item.id) === String(previewButton.dataset.docId));
+          renderPreview(doc);
+          return;
+        }
+
+        const paymentToggle = event.target.closest('.js-toggle-payments');
+        if (paymentToggle) {
+          state.paymentOpenUserId = Number(state.paymentOpenUserId) === Number(paymentToggle.dataset.userId) ? null : Number(paymentToggle.dataset.userId);
+          renderPaymentPage();
+          return;
+        }
+
+        const saveStatementButton = event.target.closest('.js-save-statement');
+        if (saveStatementButton) {
+          const rowElement = saveStatementButton.closest('.payment-statement-row');
+          const userId = saveStatementButton.dataset.userId;
+          const openingInput = rowElement.querySelector('[data-field="opening_balance_override"]');
+          const payload = {
+            month_key: state.ledger.month_key,
+            deposit: rowElement.querySelector('[data-field="deposit"]').value,
+            rent_bill: rowElement.querySelector('[data-field="rent_bill"]').value,
+            remarks: rowElement.querySelector('[data-field="remarks"]').value,
+          };
+          if (openingInput && !openingInput.disabled) {
+            payload.opening_balance_override = openingInput.value;
+          }
+
+          try {
+            await api(`/api/admin/payments/statement/${userId}`, { method: 'PATCH', body: payload });
+            await refreshLedger();
+            setStatus('Statement row saved.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to save the statement row.', true);
+          }
+          return;
+        }
+
+        const recordPaymentButton = event.target.closest('.js-record-payment');
+        if (recordPaymentButton) {
+          const form = event.target.closest('[data-payment-form-user-id]');
+          const userId = recordPaymentButton.dataset.userId;
+          const amount = form.querySelector('[data-payment-field="amount"]').value;
+          const paymentDateRaw = form.querySelector('[data-payment-field="payment_date"]').value;
+          const paymentDateIso = parseDdMmYyyyToIso(paymentDateRaw);
+          if (!Number(amount)) {
+            setStatus('Enter a payment amount greater than zero.', true);
+            return;
+          }
+          if (!paymentDateIso) {
+            setStatus('Date must use DD/MM/YYYY format.', true);
+            return;
+          }
+          try {
+            await api(`/api/admin/payments/statement/${userId}/payments`, {
+              method: 'POST',
+              body: {
+                month_key: state.ledger.month_key,
+                amount,
+                payment_date: paymentDateIso,
+                receipt_number: form.querySelector('[data-payment-field="receipt_number"]').value,
+                remarks: form.querySelector('[data-payment-field="remarks"]').value,
+              },
+            });
+            await refreshLedger();
+            state.paymentOpenUserId = Number(userId);
+            renderPaymentPage();
+            setStatus('Payment entry recorded.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to record the payment entry.', true);
+          }
+          return;
+        }
+
+        const saveWaterButton = event.target.closest('.js-save-water');
+        if (saveWaterButton) {
+          const rowElement = saveWaterButton.closest('tr');
+          const userId = saveWaterButton.dataset.userId;
+          try {
+            await api(`/api/admin/utilities/water/${userId}`, {
+              method: 'PUT',
+              body: {
+                month_key: state.ledger.month_key,
+                previous_reading: rowElement.querySelector('[data-water-field="previous_reading"]').value,
+                latest_reading: rowElement.querySelector('[data-water-field="latest_reading"]').value,
+              },
+            });
+            await refreshLedger();
+            setStatus('Water reading saved and synced to Payment.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to save the water reading.', true);
+          }
+          return;
+        }
+
+        const applyGarbageTenantButton = event.target.closest('.js-apply-garbage-tenant');
+        if (applyGarbageTenantButton) {
+          const rowElement = applyGarbageTenantButton.closest('tr');
+          const amount = rowElement.querySelector('[data-garbage-field="amount"]').value;
+          try {
+            await api('/api/admin/utilities/garbage', {
+              method: 'POST',
+              body: { month_key: state.ledger.month_key, scope: 'tenant', user_id: applyGarbageTenantButton.dataset.userId, amount },
+            });
+            await refreshLedger();
+            setStatus('Garbage charge applied to the selected tenant.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to apply the garbage charge.', true);
+          }
+          return;
+        }
+
+        const utilityTabButton = event.target.closest('[data-utility-tab]');
+        if (utilityTabButton) {
+          state.utilityTab = utilityTabButton.dataset.utilityTab;
+          renderUtilitiesPage();
+        }
+      });
+
+      document.body.addEventListener('input', (event) => {
+        if (event.target.matches('.js-payment-preview')) {
+          updatePaymentRowPreview(event.target.closest('.payment-statement-row'));
+        }
+        if (event.target.matches('.js-water-preview')) {
+          updateWaterRowPreview(event.target.closest('tr'));
+        }
+      });
+
+      document.getElementById('paymentMonthSelect').addEventListener('change', async () => {
+        setLedgerMonthKeyFromSelectors('payment');
+        state.paymentOpenUserId = null;
+        await refreshLedger();
+      });
+
+      document.getElementById('paymentYearSelect').addEventListener('change', async () => {
+        setLedgerMonthKeyFromSelectors('payment');
+        state.paymentOpenUserId = null;
+        await refreshLedger();
+      });
+
+      document.getElementById('utilitiesMonthSelect').addEventListener('change', async () => {
+        setLedgerMonthKeyFromSelectors('utilities');
+        state.paymentOpenUserId = null;
+        await refreshLedger();
+      });
+
+      document.getElementById('utilitiesYearSelect').addEventListener('change', async () => {
+        setLedgerMonthKeyFromSelectors('utilities');
+        state.paymentOpenUserId = null;
+        await refreshLedger();
+      });
+
+      document.getElementById('paymentFloorSelect').addEventListener('change', async (event) => {
+        state.ledger.selected_floor = event.target.value || null;
+        await refreshLedger();
+      });
+
+      document.getElementById('utilitiesFloorSelect').addEventListener('change', async (event) => {
+        state.ledger.selected_floor = event.target.value || null;
+        await refreshLedger();
+      });
+
+      document.getElementById('saveWaterRateBtn').addEventListener('click', async () => {
+        try {
+          await api('/api/admin/utilities/water-rate', {
+            method: 'POST',
+            body: { rate: document.getElementById('waterRateInput').value },
+          });
+          await refreshLedger();
+          setStatus('Water rate saved for all tenants in this property.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to save water rate.', true);
+        }
+      });
+
+      document.getElementById('overviewMonthSelect').addEventListener('change', async () => {
+        setOverviewMonthKeyFromSelectors();
+        await refreshOverviewMonthlySummary();
+        renderOverviewMonthControls();
+        renderOverview();
+      });
+
+      document.getElementById('overviewYearSelect').addEventListener('change', async () => {
+        setOverviewMonthKeyFromSelectors();
+        await refreshOverviewMonthlySummary();
+        renderOverviewMonthControls();
+        renderOverview();
+      });
+
+      document.getElementById('saveOccupancyBtn').addEventListener('click', async () => {
+        const occupied = Number(document.getElementById('occupiedUnitsInput').value || 0);
+        const vacant = Number(document.getElementById('vacantUnitsInput').value || 0);
+        try {
+          const payload = await api('/api/admin/occupancy', {
+            method: 'POST',
+            body: {
+              occupied_units: occupied,
+              vacant_units: vacant,
+            },
+          });
+          state.bootstrap.overview.overview = payload.overview || state.bootstrap.overview.overview;
+          renderOverview();
+          setStatus('Occupied and vacant units updated.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to update occupancy values.', true);
+        }
+      });
+
+      document.getElementById('applyGarbageToFloorBtn').addEventListener('click', async () => {
+        if (!state.ledger.selected_floor) {
+          setStatus('Select a floor first.', true);
+          return;
+        }
+        if (!window.confirm(`Apply garbage to all tenants on ${formatFloorLabel(state.ledger.selected_floor)} for ${formatMonthLabel(state.ledger.month_key)}?`)) {
+          return;
+        }
+        try {
+          await api('/api/admin/utilities/garbage', {
+            method: 'POST',
+            body: {
+              month_key: state.ledger.month_key,
+              scope: 'floor',
+              amount: document.getElementById('garbageBulkAmount').value,
+              floor_number: state.ledger.selected_floor,
+              active_floor_number: state.ledger.selected_floor,
+            },
+          });
+          await refreshLedger();
+          setStatus('Garbage charge applied to the selected floor.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to apply the floor garbage charge.', true);
+        }
+      });
+
+      document.getElementById('applyGarbageToAllBtn').addEventListener('click', async () => {
+        if (!window.confirm(`Apply garbage to all tenants in ${propertyName()} for ${formatMonthLabel(state.ledger.month_key)}?`)) {
+          return;
+        }
+        try {
+          await api('/api/admin/utilities/garbage', {
+            method: 'POST',
+            body: {
+              month_key: state.ledger.month_key,
+              scope: 'all',
+              amount: document.getElementById('garbageBulkAmount').value,
+              active_floor_number: state.ledger.selected_floor,
+            },
+          });
+          await refreshLedger();
+          setStatus('Garbage charge applied to all tenants in the selected property.');
+        } catch (error) {
+          setStatus(error.message || 'Unable to apply the property garbage charge.', true);
+        }
+      });
+
+      showLoading(true);
+      loadDashboard();
+    </script>
+  </body>
 </html>

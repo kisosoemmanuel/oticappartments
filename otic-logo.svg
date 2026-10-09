@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="96" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">OTIC logo</title>
+  <desc id="desc">OTIC property management logo</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#eaf3ff"/>
+      <stop offset="100%" stop-color="#dfeeff"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="320" height="96" rx="18" fill="#f5f9ff"/>
+  <g transform="translate(16 12)">
+    <rect x="0" y="0" width="72" height="72" rx="18" fill="url(#bg)" stroke="#cfe1f8"/>
+    <path d="M24 18h20l14 14v22c0 9-7 16-16 16H24c-9 0-16-7-16-16V34c0-9 7-16 16-16zm-8 16v22c0 4 3 7 7 7h20c4 0 7-3 7-7V32L39 18H24c-4 0-7 3-7 7z" fill="#163d63"/>
+    <path d="M18 29h24l-12 28L18 29zm14 0l12 28h-13l-13-28h14z" fill="#1f4d7a"/>
+  </g>
+  <g transform="translate(108 26)">
+    <text x="0" y="25" font-size="30" font-weight="800" fill="#163d63" font-family="Segoe UI, Arial, sans-serif">OTIC</text>
+    <text x="0" y="52" font-size="12" letter-spacing="3" fill="#5d7287" font-family="Segoe UI, Arial, sans-serif">PROPERTY MANAGEMENT</text>
+  </g>
+</svg>

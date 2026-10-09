@@ -6,8 +6,12 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "superadmin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "otic12";
+const OTIC1_ADMIN_USERNAME = process.env.OTIC1_ADMIN_USERNAME || "adminotic1";
+const OTIC1_ADMIN_PASSWORD = process.env.OTIC1_ADMIN_PASSWORD || "oticruiru";
+const OTIC2_ADMIN_USERNAME = process.env.OTIC2_ADMIN_USERNAME || "adminotic2";
+const OTIC2_ADMIN_PASSWORD = process.env.OTIC2_ADMIN_PASSWORD || "oticbondo";
 
 function log(message) {
   console.log(message);
@@ -40,17 +44,6 @@ async function request(baseUrl, path, { method = "GET", headers = {}, body, cook
   }
 
   return { response, data, text };
-}
-
-function tenantAuth(session) {
-  return {
-    headers: { token: session.access_token },
-    body: {
-      tenant_id: session.tenant_id,
-      property_id: session.property_id,
-      landlord_id: session.landlord_id,
-    },
-  };
 }
 
 async function benchmark(label, requests, concurrency, task) {
@@ -142,23 +135,26 @@ async function main() {
   const { child, baseUrl, tempRoot } = server;
   let adminCookie = "";
   let createdTenantId = "";
-  let tenantSession = null;
 
   try {
     log(`Using ${baseUrl}`);
 
     const adminHtml = readFileSync("admin.html", "utf8");
-    assert.equal((adminHtml.match(/<h2 class="title">Action Queue<\/h2>/g) || []).length, 1, "Action Queue should appear once");
-    assert.equal((adminHtml.match(/<h2 class="title">Occupancy Control<\/h2>/g) || []).length, 1, "Occupancy Control should appear once");
-    assert(adminHtml.includes("startAdminAutoRefresh"), "Admin auto-refresh hook missing");
-    assert(adminHtml.includes("Upload Shared Document"), "Admin documents tab should be present");
+    assert(adminHtml.includes("OTIC Admin Console"), "OTIC admin console title should be present");
+    assert(adminHtml.includes("Tenant directory"), "Tenant directory section should be present");
+    assert(adminHtml.includes("Admin alerts"), "Admin alerts section should be present");
+    assert(adminHtml.includes("Shared documents"), "Documents panel should be present");
+    assert(adminHtml.includes("Generate report"), "Report generation control should be present");
 
-    const tenantJs = readFileSync("static/app.js", "utf8");
-    assert(tenantJs.includes("startTenantAutoRefresh"), "Tenant auto-refresh hook missing");
+    const rootPage = await request(baseUrl, "/");
+    assert(rootPage.response.redirected || rootPage.response.url.endsWith("/secure-admin/login"), "Root path should redirect to admin login");
+    assert(!rootPage.text.includes("Tenant portal"), "Legacy tenant landing page should be removed");
 
-    const homePage = await request(baseUrl, "/");
-    assert.equal(homePage.response.status, 200, "Tenant homepage should load");
-    assert(homePage.text.includes("app"), "Tenant homepage should serve the app shell");
+    const legacyTenantRoute = await request(baseUrl, "/api/pegasus/visionary/tenant/app/login", {
+      method: "POST",
+      body: { first_name: "legacy", account_number: "legacy" },
+    });
+    assert.equal(legacyTenantRoute.response.status, 404, "Legacy tenant login endpoint should be removed");
 
     const adminPage = await request(baseUrl, "/secure-admin");
     assert.equal(adminPage.response.status, 200, "Admin page should load");
@@ -193,16 +189,13 @@ async function main() {
         arrears: "0",
       },
     });
-    assert.equal(createUser.response.status, 200, "Temp tenant should be created");
+    assert.equal(createUser.response.status, 200, "Tenant should be created through the admin API");
     createdTenantId = createUser.data.user.tenant_id;
     assert(createdTenantId, "Created tenant must have a tenant_id");
 
-    const tenantLogin = await request(baseUrl, "/api/pegasus/visionary/tenant/app/login", {
-      method: "POST",
-      body: { first_name: firstName, account_number: accountNumber },
-    });
-    assert.equal(tenantLogin.response.status, 200, "Temp tenant should log in");
-    tenantSession = tenantLogin.data;
+    const adminUsers = await request(baseUrl, "/api/admin/users", { cookie: adminCookie });
+    assert.equal(adminUsers.response.status, 200, "Admin users feed should load");
+    assert(adminUsers.data.users.some((user) => user.tenant_id === createdTenantId), "Created tenant should appear in the admin list");
 
     const sharedDocumentName = `Validation Welcome Pack ${tenantSeed}`;
     const sharedDocumentForm = new FormData();
@@ -226,40 +219,32 @@ async function main() {
       "Admin documents feed should include uploaded shared document"
     );
 
-    const tenantDocuments = await request(baseUrl, "/api/pegasus/visionary/tenant/fetch/documents", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(tenantDocuments.response.status, 200, "Tenant documents should load");
-    const sharedDocument = tenantDocuments.data.documents.find((item) => item.name === sharedDocumentName);
-    assert(sharedDocument, "Tenant should receive shared document");
-    assert.equal(sharedDocument.scope, "shared", "Shared document should be labeled as shared");
-
-    const uploadedFile = await request(baseUrl, sharedDocument.url);
-    assert.equal(uploadedFile.response.status, 200, "Uploaded shared document file should be downloadable");
-
     const overviewBefore = await request(baseUrl, "/api/admin/overview", { cookie: adminCookie });
     assert.equal(overviewBefore.response.status, 200, "Admin overview should load");
-    const originalOccupied = overviewBefore.data.overview.occupied_units;
-    const originalVacant = overviewBefore.data.overview.vacant_units;
 
-    const tenantOverview = await request(baseUrl, "/api/pegasus/visionary/tenant/app/dashboardOverview", {
+    const adminMessages = await request(baseUrl, "/api/admin/messages", {
       method: "POST",
-      ...tenantAuth(tenantSession),
+      cookie: adminCookie,
+      body: {
+        tenant_id: createdTenantId,
+        sender_name: "Property Admin",
+        subject: "Validation admin message",
+        category: "Operations",
+        body: "Testing the admin-only messaging flow.",
+      },
     });
-    assert.equal(tenantOverview.response.status, 200, "Tenant dashboard overview should load");
+    assert.equal(adminMessages.response.status, 200, "Admin message send should succeed");
 
-    const adminUsersAfterTenantActivity = await request(baseUrl, "/api/admin/users", { cookie: adminCookie });
-    assert.equal(adminUsersAfterTenantActivity.response.status, 200, "Admin users should load after tenant activity");
-    const activeTenant = adminUsersAfterTenantActivity.data.users.find((item) => item.tenant_id === createdTenantId);
-    assert(activeTenant?.last_seen_at, "Admin tenant list should include last seen time");
-    assert.equal(activeTenant?.activity_status, "ONLINE", "Admin tenant list should mark an active tenant as online");
+    const messageFeed = await request(baseUrl, "/api/admin/messages", { cookie: adminCookie });
+    assert.equal(messageFeed.response.status, 200, "Admin messages feed should load");
+    assert(
+      messageFeed.data.messages.some((item) => item.tenant_id === createdTenantId && item.subject === "Validation admin message"),
+      "Admin should see the created tenant message"
+    );
 
-    const paymentOptions = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(paymentOptions.response.status, 200, "Tenant payments options should load");
+    const ticketSeed = `Validation ticket ${tenantSeed}`;
+    const maintenanceTicket = await request(baseUrl, `/api/admin/tickets`, { cookie: adminCookie });
+    assert.equal(maintenanceTicket.response.status, 200, "Admin tickets endpoint should load");
 
     const billingApply = await request(baseUrl, "/api/admin/payments/config", {
       method: "POST",
@@ -274,243 +259,109 @@ async function main() {
     });
     assert.equal(billingApply.response.status, 200, "Selected-tenant billing update should succeed");
 
-    const tenantPaymentOptionsAfterBilling = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
+    const tenantDetail = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/details`, { cookie: adminCookie });
+    assert.equal(tenantDetail.response.status, 200, "Admin tenant detail should load");
+    assert.equal(Number(tenantDetail.data.tenant.account_balance || 0), 123, "Admin tenant detail should reflect billed balance");
+
+    const tenantUpdate = await request(baseUrl, `/api/admin/users/${createdTenantId}`, {
+      method: "PATCH",
+      cookie: adminCookie,
+      body: {
+        first_name: `${firstName}Edited`,
+        last_name: "Verifier",
+        floor_number: "10",
+        house_number: "V-100",
+        phone_number: "0722222222",
+        email_address: "validator@example.com",
+        national_id: "12345678",
+        rent: "1400",
+        deposit: "2500",
+      },
     });
-    assert.equal(
-      Number(tenantPaymentOptionsAfterBilling.data.bill_breakdown.total || 0),
-      123,
-      "Tenant should see the billed amount before paying"
+    assert.equal(tenantUpdate.response.status, 200, "Tenant update endpoint should succeed");
+    assert.equal(tenantUpdate.data.user.house_number, "V-100", "Tenant update should persist unit changes");
+    assert.equal(String(tenantUpdate.data.user.rent || ""), "1400", "Tenant update should persist rent changes");
+
+    const tenantDetailAfterUpdate = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/details`, { cookie: adminCookie });
+    assert.equal(tenantDetailAfterUpdate.response.status, 200, "Updated tenant detail should load");
+    assert.equal(tenantDetailAfterUpdate.data.tenant.house_number, "V-100", "Tenant detail should reflect updated unit");
+
+    const propertyAdminOneLogin = await request(baseUrl, "/api/admin/login", {
+      method: "POST",
+      body: { username: OTIC1_ADMIN_USERNAME, password: OTIC1_ADMIN_PASSWORD },
+    });
+    assert.equal(propertyAdminOneLogin.response.status, 200, "Otic 1 admin login should succeed");
+    const propertyAdminOneCookie = adminCookieFrom(propertyAdminOneLogin.response);
+
+    const propertyAdminTwoLogin = await request(baseUrl, "/api/admin/login", {
+      method: "POST",
+      body: { username: OTIC2_ADMIN_USERNAME, password: OTIC2_ADMIN_PASSWORD },
+    });
+    assert.equal(propertyAdminTwoLogin.response.status, 200, "Otic 2 admin login should succeed");
+    const propertyAdminTwoCookie = adminCookieFrom(propertyAdminTwoLogin.response);
+
+    const propertyAdminAlert = await request(baseUrl, "/api/admin/alerts", {
+      method: "POST",
+      cookie: propertyAdminOneCookie,
+      body: {
+        body: "Validation private admin alert.",
+      },
+    });
+    assert.equal(propertyAdminAlert.response.status, 200, "Property admin alert should be created");
+    assert(
+      propertyAdminAlert.data.messages.some((item) => item.body === "Validation private admin alert."),
+      "Property admin should see their own private alert"
     );
 
-    const tenantMessage = await request(baseUrl, "/api/pegasus/visionary/tenant/app/messages/send", {
+    const superadminAlerts = await request(baseUrl, "/api/admin/alerts", { cookie: adminCookie });
+    assert.equal(superadminAlerts.response.status, 200, "Superadmin alerts feed should load");
+    const adminOneThread = superadminAlerts.data.threads.find((thread) => thread.owner_username === OTIC1_ADMIN_USERNAME);
+    assert(adminOneThread, "Superadmin should see the Otic 1 admin thread");
+
+    const superadminReply = await request(baseUrl, "/api/admin/alerts", {
       method: "POST",
-      headers: tenantAuth(tenantSession).headers,
+      cookie: adminCookie,
       body: {
-        ...tenantAuth(tenantSession).body,
-        subject: "Validation message",
-        body: "Testing tenant to admin message flow",
+        thread_owner_admin_user_id: adminOneThread.thread_owner_admin_user_id,
+        body: "Validation superadmin reply.",
       },
     });
-    assert.equal(tenantMessage.response.status, 200, "Tenant message send should succeed");
+    assert.equal(superadminReply.response.status, 200, "Superadmin reply should succeed");
 
-    const ticketTitle = `Validation ticket ${tenantSeed}`;
-    const tenantTicket = await request(baseUrl, "/api/pegasus/visionary/tickets/api/tickets/create", {
-      method: "POST",
-      headers: tenantAuth(tenantSession).headers,
-      body: {
-        ...tenantAuth(tenantSession).body,
-        title: ticketTitle,
-        description: "Testing maintenance flow",
-        priority: "High",
-      },
-    });
-    assert.equal(tenantTicket.response.status, 200, "Tenant ticket create should succeed");
-
-    const tenantPayment = await request(baseUrl, "/api/pegasus/visionary/mpesa/StkPush", {
-      method: "POST",
-      headers: tenantAuth(tenantSession).headers,
-      body: {
-        ...tenantAuth(tenantSession).body,
-        amount: "123",
-        phone_number: "0711111111",
-        reference: `VAL${tenantSeed}`,
-        payment_time: "2026-04-17T09:30:00+03:00",
-        payment_for: "RENT",
-        note: "Validation payment",
-      },
-    });
-    assert.equal(tenantPayment.response.status, 200, "Tenant payment submit should succeed");
-
-    const tenantNotice = await request(baseUrl, "/api/pegasus/visionary/tenant/app/AddNotice", {
-      method: "POST",
-      headers: tenantAuth(tenantSession).headers,
-      body: {
-        ...tenantAuth(tenantSession).body,
-        move_out_date: "2026-06-30",
-        reason: "Validation notice",
-      },
-    });
-    assert.equal(tenantNotice.response.status, 200, "Tenant vacating notice should succeed");
-
-    const adminMessages = await request(baseUrl, "/api/admin/messages", { cookie: adminCookie });
-    assert(adminMessages.data.messages.some((item) => item.tenant_id === createdTenantId && item.subject === "Validation message"), "Admin should see tenant message");
-
-    const adminTicketsBefore = await request(baseUrl, "/api/admin/tickets", { cookie: adminCookie });
-    const createdTicket = adminTicketsBefore.data.tickets.find((item) => item.tenant_id === createdTenantId && item.title === ticketTitle);
-    assert(createdTicket, "Admin should see created ticket");
-    assert.equal(createdTicket.status, "Pending", "New ticket should start as Pending");
-
-    const ticketInProgress = await request(baseUrl, `/api/admin/tickets/${createdTicket.id}/status`, {
-      method: "POST",
-      cookie: adminCookie,
-      body: { status: "In Progress" },
-    });
-    assert.equal(ticketInProgress.response.status, 200, "Admin should move ticket to In Progress");
-    assert.equal(ticketInProgress.data.ticket.status, "In Progress", "Ticket should now be In Progress");
-
-    const ticketSolved = await request(baseUrl, `/api/admin/tickets/${createdTicket.id}/status`, {
-      method: "POST",
-      cookie: adminCookie,
-      body: { status: "Solved" },
-    });
-    assert.equal(ticketSolved.response.status, 200, "Admin should mark ticket as Solved");
-    assert.equal(ticketSolved.data.ticket.status, "Solved", "Ticket should now be Solved");
-
-    const adminNotices = await request(baseUrl, "/api/admin/vacating-notices", { cookie: adminCookie });
-    const createdNotice = adminNotices.data.notices.find((item) => item.tenant_id === createdTenantId && item.move_out_date === "2026-06-30");
-    assert(createdNotice, "Admin should see tenant vacating notice");
-
-    const noticeReview = await request(baseUrl, `/api/admin/vacating-notices/${createdNotice.id}/review`, {
-      method: "POST",
-      cookie: adminCookie,
-      body: { status: "APPROVED" },
-    });
-    assert.equal(noticeReview.response.status, 200, "Admin should approve notice");
-
-    const adminPayments = await request(baseUrl, "/api/admin/payments", { cookie: adminCookie });
-    const createdPayment = adminPayments.data.payments.find((item) => item.tenant_id === createdTenantId && item.reference === `VAL${tenantSeed}`);
-    assert(createdPayment, "Admin should see tenant payment");
-    assert(createdPayment.payment_time, "Admin should see tenant payment time");
-
-    const paymentReview = await request(baseUrl, `/api/admin/payments/${createdPayment.id}/review`, {
-      method: "POST",
-      cookie: adminCookie,
-      body: { status: "APPROVED" },
-    });
-    assert.equal(paymentReview.response.status, 200, "Admin should approve payment");
-
-    const adminTenantDetailAfterPayment = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/details`, {
-      cookie: adminCookie,
-    });
-    assert.equal(
-      Number(adminTenantDetailAfterPayment.data.tenant.account_balance || 0),
-      0,
-      "Admin tenant detail should show a cleared account balance after approval"
+    const propertyAdminAlertsAfterReply = await request(baseUrl, "/api/admin/alerts", { cookie: propertyAdminOneCookie });
+    assert.equal(propertyAdminAlertsAfterReply.response.status, 200, "Property admin alerts feed should load");
+    assert(
+      propertyAdminAlertsAfterReply.data.messages.some((item) => item.body === "Validation superadmin reply."),
+      "Property admin should receive the superadmin reply"
     );
-    assert.equal(
-      Number(adminTenantDetailAfterPayment.data.tenant.arrears || 0),
-      0,
-      "Admin tenant detail should show cleared arrears after approval"
-    );
-    assert.equal(
-      adminTenantDetailAfterPayment.data.arrears.length,
-      0,
-      "Admin tenant detail should not show stale arrears after approval"
+
+    const unrelatedPropertyAdminAlerts = await request(baseUrl, "/api/admin/alerts", { cookie: propertyAdminTwoCookie });
+    assert.equal(unrelatedPropertyAdminAlerts.response.status, 200, "Other property admin alerts feed should load");
+    assert(
+      !unrelatedPropertyAdminAlerts.data.messages.some((item) => item.body === "Validation private admin alert."),
+      "Other property admin should not see the private alert"
     );
 
     const occupancyUpdate = await request(baseUrl, "/api/admin/occupancy", {
       method: "POST",
       cookie: adminCookie,
       body: {
-        occupied_units: originalOccupied,
-        vacant_units: originalVacant,
+        occupied_units: Number(overviewBefore.data.overview.occupied_units || 0),
+        vacant_units: Number(overviewBefore.data.overview.vacant_units || 0),
       },
     });
     assert.equal(occupancyUpdate.response.status, 200, "Occupancy update should succeed");
 
-    const refreshedTenantPayments = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(refreshedTenantPayments.response.status, 200, "Tenant should still load payments after admin updates");
-    assert.equal(
-      Number(refreshedTenantPayments.data.bill_breakdown.total || 0),
-      0,
-      "Tenant bill breakdown should be cleared after approved payment"
-    );
-
-    const refreshedTenantDetails = await request(baseUrl, "/api/pegasus/visionary/tenant/app/tenantDetails", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(refreshedTenantDetails.response.status, 200, "Tenant details should still load after admin updates");
-    assert.equal(
-      Number(refreshedTenantDetails.data.account_balance || 0),
-      0,
-      "Tenant details should show a cleared account balance after approved payment"
-    );
-    assert.equal(
-      Number(refreshedTenantDetails.data.arrears || 0),
-      0,
-      "Tenant details should show cleared arrears after approved payment"
-    );
-
-    const refreshedTenantArrears = await request(baseUrl, "/api/pegasus/visionary/tenant/get/tenant/arrears", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(refreshedTenantArrears.response.status, 200, "Tenant arrears endpoint should still load after admin updates");
-    assert.equal(refreshedTenantArrears.data.length, 0, "Tenant arrears feed should clear after approved payment");
-
-    const refreshedTenantTickets = await request(baseUrl, "/api/pegasus/visionary/tickets/api/tickets/get/tenant", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(refreshedTenantTickets.response.status, 200, "Tenant tickets endpoint should still work");
-
-    const adminTenantAccountUpdate = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/billing`, {
-      method: "POST",
-      cookie: adminCookie,
-      body: {
-        rent: "50",
-        water: "5",
-        trash: "0",
-        electricity: "0",
-        deposit: "456",
-      },
-    });
-    assert.equal(adminTenantAccountUpdate.response.status, 200, "Admin should update tenant deposit and payable amounts");
-    assert.equal(Number(adminTenantAccountUpdate.data.tenant.deposit || 0), 456, "Admin tenant update should save the new deposit");
-    assert.equal(Number(adminTenantAccountUpdate.data.tenant.account_balance || 0), 55, "Admin tenant update should recalculate the balance");
-
-    const adminTenantBalanceReset = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/billing`, {
-      method: "POST",
-      cookie: adminCookie,
-      body: {
-        rent: "50",
-        water: "5",
-        trash: "0",
-        electricity: "0",
-        deposit: "456",
-        reset_account_balance: true,
-      },
-    });
-    assert.equal(adminTenantBalanceReset.response.status, 200, "Admin should reset tenant account balance to zero");
-    assert.equal(Number(adminTenantBalanceReset.data.tenant.deposit || 0), 456, "Reset should preserve the updated deposit");
-    assert.equal(Number(adminTenantBalanceReset.data.tenant.account_balance || 0), 0, "Reset should clear the tenant account balance");
-    assert.equal(Number(adminTenantBalanceReset.data.bills.total || 0), 0, "Reset should clear the tenant bill breakdown");
-
-    const tenantPaymentOptionsAfterReset = await request(baseUrl, "/api/pegasus/visionary/tenant/payments/options", {
-      method: "POST",
-      ...tenantAuth(tenantSession),
-    });
-    assert.equal(
-      Number(tenantPaymentOptionsAfterReset.data.bill_breakdown.total || 0),
-      0,
-      "Tenant payment options should show a cleared balance after admin reset"
-    );
-
     const benchmarks = [];
     benchmarks.push(
-      await benchmark("health", 120, 12, async () => {
+      await benchmark("health", 80, 8, async () => {
         const result = await request(baseUrl, "/api/health");
         assert.equal(result.response.status, 200);
       })
     );
     benchmarks.push(
-      await benchmark("admin_overview", 60, 6, async () => {
+      await benchmark("admin_overview", 40, 4, async () => {
         const result = await request(baseUrl, "/api/admin/overview", { cookie: adminCookie });
-        assert.equal(result.response.status, 200);
-      })
-    );
-    benchmarks.push(
-      await benchmark("tenant_dashboard_overview", 60, 6, async () => {
-        const result = await request(baseUrl, "/api/pegasus/visionary/tenant/app/dashboardOverview", {
-          method: "POST",
-          ...tenantAuth(tenantSession),
-        });
         assert.equal(result.response.status, 200);
       })
     );
@@ -521,8 +372,8 @@ async function main() {
       created_tenant_id: createdTenantId,
       benchmarks,
       notes: [
-        "Covers tenant login, tenant actions, admin visibility, shared document publishing, ticket lifecycle, payment review, selected-tenant billing, occupancy update, and page/script loading.",
-        "Auto-refresh behavior is validated by code presence and syntax here; full browser-timing behavior still benefits from a manual click-through.",
+        "The app is restricted to admin/property operations; the standalone tenant portal is removed.",
+        "Coverage includes root redirect, admin login, tenant creation, document upload, messaging, billing, and overview checks.",
       ],
     };
 

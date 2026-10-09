@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { fileURLToPath } from "url";
 import {
   addAlert,
+  addAdminAlertMessage,
   addSharedDocument,
   addMaintenanceTicket,
   applyBulkTenantBalanceAction,
@@ -18,11 +19,28 @@ import {
   adjustUserBalance,
   applyGlobalBilling,
   createUser,
+  createAdminUser,
+  createUnit,
+  createTenancy,
   DATABASE_PROVIDER,
   DATABASE_PATH,
   deleteUserById,
+  getAdminUserByUsername,
+  getAdminUserById,
+  getUnitById,
+  getMonthlyStatement,
+  listAdminAlertMessagesByThreadOwner,
+  listAdminAlertThreads,
+  listAdminUsers,
+  listAuditLogs,
+  listMonthlyTenantLedger,
+  listTenantTenancies,
+  listTenanciesForProperty,
+  listUnitsForProperty,
+  writeAuditLog,
   getMaintenanceTicketById,
   getPaymentRequestById,
+  getPaymentRequestByProviderCheckoutId,
   getAdminSetting,
   getActiveLeaseForUser,
   getPortfolioOverview,
@@ -49,9 +67,14 @@ import {
   listVacateNoticesForUser,
   recalculateUserFinancials,
   setAdminSetting,
+  setMonthlyGarbageAmount,
   touchUserActivity,
+  upsertMonthlyStatement,
+  upsertMonthlyWaterReading,
   updateMaintenanceTicketStatus,
+  updatePaymentRequest,
   updatePaymentRequestStatus,
+  addMonthlyPaymentEntry,
   updateUserBilling,
   updateUserToken,
   updateUserProfile,
@@ -64,13 +87,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.disable("x-powered-by");
 app.use(cors());
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("Referrer-Policy", "no-referrer");
+  res.set("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  next();
+});
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const DEFAULT_ADMIN_USERNAME = "admin";
-const DEFAULT_ADMIN_PASSWORD = "admin123";
+const DEFAULT_ADMIN_USERNAME = "superadmin";
+const DEFAULT_ADMIN_PASSWORD = "otic12";
 const DEFAULT_BACKUP_SECRET = "otic-local-backup-secret";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
@@ -85,9 +116,20 @@ const MPESA_ACCOUNT_NUMBER = "024000000880";
 const TENANT_ONLINE_WINDOW_MS = 2 * 60 * 1000;
 const TENANT_RECENT_WINDOW_MS = 30 * 60 * 1000;
 const TENANT_ACTIVITY_TOUCH_WINDOW_MS = 20 * 1000;
+const APP_BASE_URL = String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
 const PROPERTY_TIME_ZONE = process.env.APP_TIME_ZONE || "Africa/Nairobi";
 const BILLING_DUE_DAY = 7;
 const OVERDUE_ALERT_DELAY_DAYS = 5;
+const MPESA_CALLBACK_PATH = "/api/payments/mpesa/callback";
+const MPESA_PROVIDER = "SAFARICOM";
+const MPESA_PROVIDER_MODE = String(process.env.MPESA_PROVIDER_MODE || "").trim().toLowerCase();
+const MPESA_ENV = String(process.env.MPESA_ENV || process.env.MPESA_DARAJA_ENV || "sandbox").trim().toLowerCase();
+const MPESA_SHORTCODE = String(process.env.MPESA_SHORTCODE || process.env.MPESA_BUSINESS_SHORTCODE || "").trim();
+const MPESA_PASSKEY = String(process.env.MPESA_PASSKEY || "").trim();
+const MPESA_CONSUMER_KEY = String(process.env.MPESA_CONSUMER_KEY || "").trim();
+const MPESA_CONSUMER_SECRET = String(process.env.MPESA_CONSUMER_SECRET || "").trim();
+const MPESA_CALLBACK_URL = String(process.env.MPESA_CALLBACK_URL || (APP_BASE_URL ? `${APP_BASE_URL}${MPESA_CALLBACK_PATH}` : "")).trim();
+const MPESA_TRANSACTION_TYPE = String(process.env.MPESA_TRANSACTION_TYPE || "CustomerPayBillOnline").trim();
 const propertyDatePartsFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: PROPERTY_TIME_ZONE,
   year: "numeric",
@@ -99,6 +141,16 @@ const propertyDateLabelFormatter = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
   year: "numeric",
+});
+const mpesaDateTimePartsFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: PROPERTY_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
 });
 const adminSessions = new Map();
 const adminCookieOptions = {
@@ -374,16 +426,21 @@ async function buildAutomatedAlerts(user) {
 }
 
 function paymentMethodsFor(user) {
+  const providerSummary = buildMpesaProviderSummary();
   return [
     {
-      id: "mpesa-paybill",
-      label: "M-PESA Paybill",
+      id: "mpesa-stk-push",
+      label: providerSummary.mode === "daraja" ? "M-PESA Prompt" : "M-PESA Prompt (Local Mode)",
       provider: "Safaricom",
-      description: `Pay via Paybill ${MPESA_PAYBILL_NUMBER} using account ${MPESA_ACCOUNT_NUMBER}.`,
+      description:
+        providerSummary.mode === "daraja"
+          ? "Enter the amount and phone number, then approve the M-PESA prompt on your handset."
+          : "Local mode is active. The system will simulate a prompt so you can test the full admin workflow.",
       enabled: true,
       prefill: user.phone_number || "",
       paybill_number: MPESA_PAYBILL_NUMBER,
       account_number: MPESA_ACCOUNT_NUMBER,
+      provider_mode: providerSummary.mode,
     },
   ];
 }
@@ -483,6 +540,110 @@ function parseNonNegativeMoney(value, fieldName) {
   return String(amount);
 }
 
+function parseLedgerMonthKey(value) {
+  const normalized = String(value || "").trim();
+  if (!/^\d{4}-\d{2}$/.test(normalized)) {
+    throw new Error("month must be in YYYY-MM format");
+  }
+  return normalized;
+}
+
+function getCurrentLedgerMonthKey() {
+  const parts = getDatePartsInPropertyTimeZone(new Date());
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}`;
+}
+
+function formatLedgerMonthLabel(monthKey) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: PROPERTY_TIME_ZONE,
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${monthKey}-01T12:00:00Z`));
+}
+
+function parseOptionalLedgerNumber(value, fieldName, { allowNegative = false, emptyValue = 0 } = {}) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return emptyValue;
+  }
+
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount)) {
+    throw new Error(`${fieldName} must be a number`);
+  }
+  if (!allowNegative && amount < 0) {
+    throw new Error(`${fieldName} must be a non-negative number`);
+  }
+
+  return amount;
+}
+
+function normalizeFloorValue(value) {
+  const normalized = String(value || "").trim();
+  return normalized && normalized.toLowerCase() !== "all" ? normalized : null;
+}
+
+function summarizeMonthlyLedgerRows(rows = []) {
+  return rows.reduce(
+    (summary, row) => {
+      summary.tenant_count += 1;
+      summary.dues_total += Number(row.dues || 0);
+      summary.payment_total += Number(row.payment_total || 0);
+      summary.balance_total += Number(row.balance || 0);
+      summary.water_total += Number(row.water_bill || 0);
+      summary.garbage_total += Number(row.garbage_amount || 0);
+      return summary;
+    },
+    {
+      tenant_count: 0,
+      dues_total: 0,
+      payment_total: 0,
+      balance_total: 0,
+      water_total: 0,
+      garbage_total: 0,
+    }
+  );
+}
+
+async function buildMonthlyLedgerPayload(propertyId, monthKey, floorNumber = null) {
+  const initial = await listMonthlyTenantLedger({ propertyId, monthKey, floorNumber });
+  const selectedFloor = floorNumber || null;
+  const ledger = selectedFloor ? await listMonthlyTenantLedger({ propertyId, monthKey, floorNumber: selectedFloor }) : initial;
+  const waterRate = Number((await getScopedAdminSetting(propertyId, "utility_water_rate", "0")) || 0);
+
+  const rows = ledger.rows.map((row) => {
+    const previousReading = Number(row.previous_meter_reading || 0);
+    const latestReading = Number(row.latest_meter_reading || 0);
+    const consumption = latestReading - previousReading;
+    const effectiveRate = Number.isFinite(waterRate) ? waterRate : Number(row.rate || 0);
+    const waterBill = consumption * effectiveRate;
+    const dues = Number(row.dues || 0) - Number(row.water_bill || 0) + waterBill;
+    const balance = Number(row.payment_total || 0) - dues;
+
+    return {
+      ...row,
+      rate: effectiveRate,
+      water_bill: waterBill,
+      dues,
+      balance,
+    };
+  });
+
+  return {
+    month_key: monthKey,
+    month_label: formatLedgerMonthLabel(monthKey),
+    selected_floor: selectedFloor,
+    floors: initial.floors,
+    water_rate: waterRate,
+    rows,
+    summary: summarizeMonthlyLedgerRows(rows),
+  };
+}
+
 function parseRequiredDateTime(value, fieldName) {
   const normalized = String(value ?? "").trim();
   if (!normalized) {
@@ -503,6 +664,291 @@ function parseBooleanFlag(value) {
   }
 
   return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+function hasDarajaMpesaConfig() {
+  return Boolean(
+    MPESA_SHORTCODE &&
+      MPESA_PASSKEY &&
+      MPESA_CONSUMER_KEY &&
+      MPESA_CONSUMER_SECRET &&
+      isHttpUrl(MPESA_CALLBACK_URL)
+  );
+}
+
+function getMpesaPromptMode() {
+  if (MPESA_PROVIDER_MODE === "mock") {
+    return "mock";
+  }
+  if (MPESA_PROVIDER_MODE === "daraja") {
+    return hasDarajaMpesaConfig() ? "daraja" : "misconfigured";
+  }
+  return hasDarajaMpesaConfig() ? "daraja" : "mock";
+}
+
+function buildMpesaProviderSummary() {
+  const mode = getMpesaPromptMode();
+  return {
+    provider: MPESA_PROVIDER,
+    mode,
+    environment: MPESA_ENV,
+    prompt_supported: mode === "daraja" || mode === "mock",
+    live_callback_configured: mode === "daraja",
+    callback_url: mode === "daraja" ? MPESA_CALLBACK_URL : null,
+  };
+}
+
+function normalizePaymentFor(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return ["RENT", "WATER", "TRASH", "ELECTRICITY"].includes(normalized) ? normalized : "RENT";
+}
+
+function normalizeKenyanPhoneNumber(value) {
+  const digits = String(value || "").replace(/\D+/g, "");
+  if (!digits) {
+    return "";
+  }
+  if (digits.startsWith("254") && digits.length === 12) {
+    return digits;
+  }
+  if (digits.startsWith("0") && digits.length === 10) {
+    return `254${digits.slice(1)}`;
+  }
+  if (digits.startsWith("7") && digits.length === 9) {
+    return `254${digits}`;
+  }
+  if (digits.startsWith("1") && digits.length === 9) {
+    return `254${digits}`;
+  }
+  return "";
+}
+
+function buildMpesaTimestamp(date = new Date()) {
+  const parts = {};
+  for (const part of mpesaDateTimePartsFormatter.formatToParts(date)) {
+    if (part.type !== "literal") {
+      parts[part.type] = part.value;
+    }
+  }
+  return `${parts.year}${parts.month}${parts.day}${parts.hour}${parts.minute}${parts.second}`;
+}
+
+function buildMpesaPassword(timestamp) {
+  return Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString("base64");
+}
+
+function getMpesaBaseUrl() {
+  return MPESA_ENV === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke";
+}
+
+async function getMpesaAccessToken() {
+  const credentials = Buffer.from(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`).toString("base64");
+  const response = await fetch(`${getMpesaBaseUrl()}/oauth/v1/generate?grant_type=client_credentials`, {
+    method: "GET",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+    },
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || !data?.access_token) {
+    throw new Error(data?.errorMessage || data?.error_description || "Unable to authenticate with Safaricom M-PESA.");
+  }
+
+  return data.access_token;
+}
+
+function buildTenantAccountReference(user, paymentFor) {
+  const base = `${user?.house_number || user?.tenant_id || user?.id || "OTIC"}-${paymentFor}`;
+  return base.replace(/[^A-Za-z0-9-]/g, "").slice(0, 20) || `OTIC-${paymentFor}`;
+}
+
+async function sendDarajaStkPush({ user, amount, phoneNumber, paymentFor }) {
+  const token = await getMpesaAccessToken();
+  const timestamp = buildMpesaTimestamp();
+  const payload = {
+    BusinessShortCode: MPESA_SHORTCODE,
+    Password: buildMpesaPassword(timestamp),
+    Timestamp: timestamp,
+    TransactionType: MPESA_TRANSACTION_TYPE,
+    Amount: Math.round(Number(amount || 0)),
+    PartyA: phoneNumber,
+    PartyB: MPESA_SHORTCODE,
+    PhoneNumber: phoneNumber,
+    CallBackURL: MPESA_CALLBACK_URL,
+    AccountReference: buildTenantAccountReference(user, paymentFor),
+    TransactionDesc: `${paymentFor} payment`,
+  };
+
+  const response = await fetch(`${getMpesaBaseUrl()}/mpesa/stkpush/v1/processrequest`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  const responseCode = String(data?.ResponseCode ?? "");
+  if (!response.ok || responseCode !== "0") {
+    throw new Error(data?.errorMessage || data?.ResponseDescription || "Unable to send the M-PESA prompt right now.");
+  }
+
+  return {
+    payload,
+    response: data,
+  };
+}
+
+function safeParseJson(value, fallback = null) {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function parseMpesaCallbackMetadata(items = []) {
+  const metadata = {};
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.Name) {
+      metadata[item.Name] = item.Value ?? null;
+    }
+  }
+  return metadata;
+}
+
+function parseMpesaTransactionDate(value) {
+  const normalized = String(value ?? "").trim();
+  if (!/^\d{14}$/.test(normalized)) {
+    return null;
+  }
+  const year = normalized.slice(0, 4);
+  const month = normalized.slice(4, 6);
+  const day = normalized.slice(6, 8);
+  const hour = normalized.slice(8, 10);
+  const minute = normalized.slice(10, 12);
+  const second = normalized.slice(12, 14);
+  const iso = `${year}-${month}-${day}T${hour}:${minute}:${second}+03:00`;
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function paymentStatusNeedsAdminReview(status) {
+  return String(status || "").trim().toUpperCase() === "PENDING_CONFIRMATION";
+}
+
+function paymentStatusAwaitingCallback(status) {
+  return String(status || "").trim().toUpperCase() === "PROMPT_SENT";
+}
+
+function paymentStatusAwaitingTenantConfirmation(status) {
+  return String(status || "").trim().toUpperCase() === "AUTO_POSTED_PENDING_TENANT_CONFIRMATION";
+}
+
+function paymentStatusOpen(status) {
+  const normalized = String(status || "").trim().toUpperCase();
+  return ["PROMPT_SENT", "AUTO_POSTED_PENDING_TENANT_CONFIRMATION"].includes(normalized);
+}
+
+function getOpenTenantPayment(payments = []) {
+  return payments.find((payment) => paymentStatusOpen(payment?.status)) || null;
+}
+
+function toMinuteKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().slice(0, 16);
+}
+
+function generatePortalReceiptNumber(prefix = "RCT") {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+}
+
+function buildMockPromptConfirmation() {
+  const now = new Date();
+  return {
+    reference: `MP${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+    payment_time: now.toISOString(),
+  };
+}
+
+async function incrementAcquiredCollectionTotal(propertyId, amount) {
+  const current = Number((await getScopedAdminSetting(propertyId, "acquired_collection_total", "0")) || 0);
+  await setScopedAdminSetting(propertyId, "acquired_collection_total", current + Number(amount || 0));
+}
+
+async function applyPaymentAutomatically(payment, user, { reference, paymentTime, statusAfterApply }) {
+  if (payment?.auto_applied_at) {
+    return {
+      payment,
+      user: await getUserById(payment.user_id),
+    };
+  }
+
+  const appliedAt = new Date().toISOString();
+  const refreshedUser = await adjustUserBalance(payment.user_id, payment.payment_for, payment.amount);
+  await incrementAcquiredCollectionTotal(user?.property_id || DEFAULT_PROPERTY_ID, payment.amount);
+  await addTransaction(payment.user_id, {
+    amount: payment.amount,
+    date_created: appliedAt,
+    type: `${payment.payment_for || "Payment"} Payment`,
+    description: `M-PESA prompt payment ${reference || payment.reference || ""}`.trim(),
+  });
+
+  const updatedPayment = await updatePaymentRequest(payment.id, {
+    reference: reference ?? payment.reference ?? null,
+    payment_time: paymentTime ?? payment.payment_time ?? null,
+    status: statusAfterApply,
+    auto_applied_at: appliedAt,
+    completed_at: appliedAt,
+    receipt_number: payment.receipt_number || reference || generatePortalReceiptNumber("MPS"),
+  });
+
+  await addAlert(payment.user_id, {
+    type: "payment",
+    title: "Payment received",
+    message: `Your payment of KES ${Number(payment.amount || 0).toLocaleString()} has been posted to your account balance.`,
+    severity: "success",
+    trigger_date: appliedAt,
+  });
+
+  await addMessage(payment.user_id, {
+    sender_type: "SYSTEM",
+    sender_name: "Billing Desk",
+    subject: "Payment Posted",
+    category: "Payments",
+    body:
+      `Dear ${user?.first_name || "Tenant"},\n\n` +
+      `We have posted your payment of KSH ${Number(payment.amount || 0).toFixed(2)} for ${payment.payment_for || "RENT"}.\n` +
+      `Remaining balance: KSH ${Number(refreshedUser?.account_balance || 0).toFixed(2)}.\n\n` +
+      "If requested, please finish the extra confirmation step in the approval flow.\n\nRegards,\nOtic Apartments Team",
+  });
+
+  return {
+    payment: updatedPayment,
+    user: refreshedUser,
+  };
 }
 
 async function getExpectedCollectionTotal(users = null, propertyId = null) {
@@ -529,11 +975,13 @@ function signAdminSessionPayload(payload) {
   return crypto.createHmac("sha256", BACKUP_SECRET).update(payload).digest("hex");
 }
 
-function createAdminSession(username, propertyId = DEFAULT_PROPERTY_ID) {
+function createAdminSession(username, propertyId = null, role = "SUPER_ADMIN") {
+  const normalizedPropertyId = String(propertyId || "").trim();
   const payload = Buffer.from(
     JSON.stringify({
       username,
-      property_id: String(propertyId || DEFAULT_PROPERTY_ID).trim() || DEFAULT_PROPERTY_ID,
+      role: String(role || "SUPER_ADMIN").trim().toUpperCase(),
+      property_id: normalizedPropertyId || null,
       expires_at: Date.now() + 1000 * 60 * 60 * 12,
     })
   ).toString("base64url");
@@ -570,6 +1018,7 @@ function getAdminSessionFromToken(token) {
 
     return {
       username: parsed.username,
+      role: String(parsed.role || "SUPER_ADMIN").trim().toUpperCase(),
       property_id: String(parsed.property_id || "").trim() || null,
       created_at: new Date(Number(parsed.expires_at) - 1000 * 60 * 60 * 12).toISOString(),
       expires_at: new Date(Number(parsed.expires_at)).toISOString(),
@@ -593,22 +1042,28 @@ function setAdminSessionToken(res, token) {
   });
 }
 
-async function resolveAdminPropertyContext(selectedPropertyId = null) {
-  const properties = await listProperties();
-  if (!properties.length) {
-    throw new Error("No properties are configured.");
+async function resolveAdminPropertyContext(selectedPropertyId = null, role = "SUPER_ADMIN") {
+  const allProperties = (await listProperties()).filter((property) => ["otic-1", "otic-2"].includes(String(property.id || "").trim()));
+  if (!allProperties.length) {
+    throw new Error("No valid OTIC properties are configured.");
   }
 
+  const normalizedRole = String(role || "SUPER_ADMIN").trim().toUpperCase();
   const normalizedPropertyId = String(selectedPropertyId || "").trim();
+  const allowedPropertyId = normalizedRole === "PROPERTY_ADMIN" ? normalizedPropertyId || "otic-1" : null;
+  const effectivePropertyId = allowedPropertyId || normalizedPropertyId || DEFAULT_PROPERTY_ID;
+  const properties = normalizedRole === "PROPERTY_ADMIN"
+    ? allProperties.filter((property) => property.id === effectivePropertyId)
+    : allProperties;
   const selectedProperty =
-    properties.find((property) => property.id === normalizedPropertyId) ||
-    properties.find((property) => property.id === DEFAULT_PROPERTY_ID) ||
-    properties[0];
+    properties.find((property) => property.id === effectivePropertyId) ||
+    allProperties.find((property) => property.id === DEFAULT_PROPERTY_ID) ||
+    allProperties[0];
 
-  return { properties, selectedProperty };
+  return { properties, selectedProperty, allowedPropertyId };
 }
 
-function requireAdminSession(req, res, next) {
+async function requireAdminSession(req, res, next) {
   const cookies = parseCookies(req);
   const token =
     cookies[ADMIN_SESSION_COOKIE] ||
@@ -619,14 +1074,37 @@ function requireAdminSession(req, res, next) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  req.adminSession = session;
+  const adminUser = await getAdminUserByUsername(session.username);
+  if (!adminUser || adminUser.status !== "ACTIVE") {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (adminUser.role === "PROPERTY_ADMIN" && session.property_id && session.property_id !== (adminUser.property_id || "otic-1")) {
+    return res.status(403).json({ error: "Forbidden: This administrator can only access their assigned property." });
+  }
+
+  req.adminSession = {
+    ...session,
+    role: adminUser.role,
+    property_id: adminUser.role === "PROPERTY_ADMIN" ? adminUser.property_id || "otic-1" : session.property_id || null,
+  };
+  req.adminUser = adminUser;
   next();
 }
 
 const requireAdminPropertyContext = asyncHandler(async (req, _res, next) => {
-  const { properties, selectedProperty } = await resolveAdminPropertyContext(req.adminSession.property_id);
+  const { properties, selectedProperty, allowedPropertyId } = await resolveAdminPropertyContext(
+    req.adminSession.property_id,
+    req.adminSession.role
+  );
+
+  if (req.adminSession.role === "PROPERTY_ADMIN" && selectedProperty.id !== (req.adminSession.property_id || "otic-1")) {
+    return _res.status(403).json({ error: "Forbidden: This administrator cannot access a different property." });
+  }
+
   req.adminProperties = properties;
   req.adminProperty = selectedProperty;
+  req.adminAllowedPropertyId = allowedPropertyId || null;
   next();
 });
 
@@ -676,371 +1154,61 @@ app.use("/api/admin", (_req, res, next) => {
   next();
 });
 
-app.post("/api/pegasus/visionary/tenant/app/login", asyncHandler(async (req, res) => {
-  const { first_name, account_number } = req.body || {};
-  if (!first_name || !account_number) {
-    return res.status(400).json({ error: "Missing credentials" });
-  }
-
-  const user = (await listUsersByFirstName(first_name)).find((item) =>
-    verifyPassword(account_number, item.account_number_hash)
-  );
-  if (!user) {
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
-
-  const access_token = crypto.randomBytes(24).toString("hex");
-  await updateUserToken(user.id, access_token);
-
-  const refreshedUser = await touchUserActivity(user.id, { mark_login: true });
-  res.json({ ...sanitizeUser(refreshedUser), access_token });
-}));
-
 app.use("/uploads", express.static(UPLOAD_DIR));
 
-app.post("/api/pegasus/visionary/tenant/app/tenantDetails", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json(sanitizeUser(user));
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/profile/update", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  const updated = await updateUserProfile(user.id, {
-    first_name: String(req.body?.first_name || user.first_name || "").trim(),
-    last_name: String(req.body?.last_name || user.last_name || "").trim(),
-    phone_number: String(req.body?.phone_number || user.phone_number || "").trim(),
-    email_address: String(req.body?.email_address || user.email_address || "").trim(),
-    national_id: String(req.body?.national_id || user.national_id || "").trim(),
-  });
-
-  res.json({ success: true, user: sanitizeUser(updated) });
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/dashboardOverview", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  const lease = await getActiveLeaseForUser(user.id);
-  const alerts = [...(await buildAutomatedAlerts(user)), ...(await listStoredAlertsForUser(user.id))].slice(0, 5);
-  const maintenance = await listMaintenanceForUser(user.id);
-  const messages = await listMessagesForUser(user.id);
-  const vacateNotices = await listVacateNoticesForUser(user.id);
-  const payments = await listPaymentRequestsForUser(user.id);
-  const bills = await getTenantBillBreakdown(user);
-  res.json({
-    portfolio: await getPortfolioOverviewWithOverrides(user.property_id || DEFAULT_PROPERTY_ID),
-    tenant: {
-      rent_status: bills.total > 0 ? "Outstanding" : "Current",
-      active_lease: Boolean(lease),
-      lease_end_date: lease?.end_date || null,
-      next_payment_target: bills.total,
-      open_maintenance_count: maintenance.filter((item) => !["Resolved", "Solved"].includes(item.status)).length,
-      unread_messages: messages.filter((item) => item.status === "UNREAD").length,
-      vacate_notice_status: vacateNotices[0]?.status || "Not Submitted",
-      latest_payment_reference: payments[0]?.reference || null,
-    },
-    alerts,
-  });
-}));
-
-app.post("/api/pegasus/visionary/tenant/get/tenant/arrears", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json(await listArrearsForUser(user.id));
-}));
-
-app.post("/api/pegasus/visionary/tenant/get/tenant/transactions", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json(await listTransactionsForUser(user.id));
-}));
-
-app.post("/api/pegasus/visionary/tenant/payments/options", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  const bills = await getTenantBillBreakdown(user);
-  res.json({
-    methods: paymentMethodsFor(user),
-    history: await listPaymentRequestsForUser(user.id),
-    bill_breakdown: bills,
-    instructions: {
-      paybill_number: MPESA_PAYBILL_NUMBER,
-      account_number: MPESA_ACCOUNT_NUMBER,
-      steps: [
-        "Open M-PESA on your phone.",
-        `Select Pay Bill and enter ${MPESA_PAYBILL_NUMBER}.`,
-        `Use ${MPESA_ACCOUNT_NUMBER} as the account number.`,
-        "Enter the amount you are paying and complete the transaction.",
-        "Return to the portal and submit the M-PESA confirmation code and payment time for verification.",
-      ],
-    },
-  });
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/alerts/get", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json([...(await buildAutomatedAlerts(user)), ...(await listStoredAlertsForUser(user.id))]);
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/messages/get", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json({ messages: await listMessagesForUser(user.id) });
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/messages/send", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  const body = String(req.body?.body || "").trim();
-  if (!body) {
-    return res.status(400).json({ error: "body is required" });
-  }
-
-  await addMessage(user.id, {
-    sender_type: "TENANT",
-    sender_name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.first_name,
-    subject: req.body?.subject || "Tenant message",
-    body,
-    category: req.body?.category || "Tenant",
-    status: "UNREAD",
-  });
-
-  res.json({ success: true, messages: await listMessagesForUser(user.id) });
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/AddNotice", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  const moveOutDate = String(req.body?.move_out_date || "").trim();
-  if (!moveOutDate) {
-    return res.status(400).json({ error: "move_out_date is required" });
-  }
-
-  await addVacateNotice(user.id, {
-    move_out_date: moveOutDate,
-    reason: req.body?.reason || "",
-    forwarding_address: req.body?.forwarding_address || "",
-    phone_number: req.body?.phone_number || user.phone_number || "",
-    status: "Pending",
-  });
-
-  await addAlert(user.id, {
-    type: "vacating_notice",
-    title: "Vacating notice submitted",
-    message: `Your vacating notice for ${moveOutDate} has been received.`,
-    severity: "info",
-    trigger_date: new Date().toISOString(),
-  });
-
-  await addMessage(user.id, {
-    sender_type: "SYSTEM",
-    sender_name: "Tenancy Desk",
-    subject: "Vacating notice received",
-    category: "Tenancy",
-    body:
-      `Dear ${user.first_name || "Tenant"},\n\n` +
-      `We have received your vacating notice for ${moveOutDate}.\n` +
-      "Our team will contact you to coordinate inspection and final settlement.\n\nRegards,\nOtic Apartments Team",
-  });
-
-  res.json({ success: true, notices: await listVacateNoticesForUser(user.id) });
-}));
-
-app.post("/api/pegasus/visionary/authorization/admin/delete/specific/tenant/notices", (req, res) => {
-  res.json({ success: true });
+app.all("/api/pegasus/visionary/*", (req, res) => {
+  res.status(404).json({ error: "Legacy tenant API removed. Use the admin/property system instead." });
 });
-
-app.post("/api/pegasus/visionary/agreements/fetch", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  const leases = (await listLeasesForUser(user.id)).map((lease) => ({
-    ...lease,
-    agreement_title: lease.lease_name,
-  }));
-  res.json({ agreements: leases });
-}));
-
-app.post("/api/pegasus/visionary/lease/active", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  const lease = await getActiveLeaseForUser(user.id);
-  res.json({ has_active_lease: Boolean(lease), lease_details: lease });
-}));
-
-app.post("/api/pegasus/visionary/lease/history", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json({ lease_history: await listLeasesForUser(user.id) });
-}));
-
-app.post("/api/pegasus/visionary/mpesa/StkPush", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  const amount = String(req.body?.amount || user.rent || "0");
-  const method = "M-PESA Paybill";
-  const phone_number = req.body?.phone_number || user.phone_number || "";
-  const reference = String(req.body?.reference || "").trim();
-  const payment_time_raw = req.body?.payment_time;
-  const payment_for = String(req.body?.payment_for || "RENT").toUpperCase();
-  let payment_time;
-
-  if (!reference) {
-    return res.status(400).json({ error: "reference is required" });
-  }
-
-  try {
-    payment_time = parseRequiredDateTime(payment_time_raw, "payment_time");
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
-  }
-
-  await addPaymentRequest(user.id, {
-    method,
-    amount,
-    phone_number,
-    reference,
-    payment_time,
-    payment_for,
-    status: "PENDING_CONFIRMATION",
-    note:
-      req.body?.note ||
-        `Tenant reported a Paybill payment to ${MPESA_PAYBILL_NUMBER} account ${MPESA_ACCOUNT_NUMBER}.`,
-  });
-
-  await addAlert(user.id, {
-    type: "payment",
-    title: "Payment submitted for verification",
-    message: `Your M-PESA Paybill payment of KES ${Number(amount || 0).toLocaleString()} has been submitted and is awaiting confirmation.`,
-    severity: "info",
-    trigger_date: new Date().toISOString(),
-  });
-
-  await addMessage(user.id, {
-    sender_type: "SYSTEM",
-    sender_name: "Billing Desk",
-    subject: "Paybill payment submitted",
-    category: "Payments",
-    body:
-      `Dear ${user.first_name || "Tenant"},\n\n` +
-      `We have received your Paybill payment confirmation for KSH: ${Number(amount || 0).toFixed(2)}.\n` +
-      `M-PESA Code: ${reference}\n` +
-      `Payment Time: ${payment_time}\n` +
-      `Payment For: ${payment_for}\n` +
-      `Paybill: ${MPESA_PAYBILL_NUMBER}\n` +
-      `Account: ${MPESA_ACCOUNT_NUMBER}\n\n` +
-      "Our team will verify the payment and update your account shortly.",
-  });
-
-  res.json({
-    success: true,
-    Message: "Payment confirmation submitted successfully",
-    reference,
-    payment_time,
-    method,
-  });
-}));
-
-app.post("/api/pegasus/visionary/tenant/arrear/dirty", (req, res) => {
-  res.json({ success: true });
-});
-
-app.post("/api/pegasus/visionary/tenant/app/tenant/ID/upload", (req, res) => {
-  res.json({ success: true });
-});
-
-app.post("/api/pegasus/visionary/tenant/fetch/documents", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json({ success: true, documents: await listDocumentsForUser(user.id, { propertyId: user.property_id || DEFAULT_PROPERTY_ID }) });
-}));
-
-app.post("/api/pegasus/visionary/tickets/api/tickets/get/tenant", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json({ tickets: (await listMaintenanceForUser(user.id)).map(sanitizeTenantMaintenanceTicket) });
-}));
-
-app.post("/api/pegasus/visionary/tickets/api/tickets/create", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  const title = String(req.body?.title || "").trim();
-  if (!title) {
-    return res.status(400).json({ error: "title is required" });
-  }
-
-  await addMaintenanceTicket(user.id, {
-    title,
-    description: req.body?.description || "",
-    priority: req.body?.priority || "Medium",
-    status: "Pending",
-    technician_name: req.body?.technician_name || null,
-  });
-
-  await addAlert(user.id, {
-    type: "maintenance",
-    title: "Maintenance request created",
-    message: `Your request "${title}" has been logged for follow-up.`,
-    severity: "info",
-    trigger_date: new Date().toISOString(),
-  });
-
-  res.json({ success: true, tickets: (await listMaintenanceForUser(user.id)).map(sanitizeTenantMaintenanceTicket) });
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/security/status", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-
-  res.json({
-    encrypted_password_storage: true,
-    token_based_auth: true,
-    encrypted_backup: DATABASE_PROVIDER === "sqlite",
-    backups: getBackupStats(),
-    note:
-      DATABASE_PROVIDER === "sqlite"
-        ? "Account passwords are hashed, tokens are validated per session, and local database backups are encrypted with AES-256-GCM."
-        : "Account passwords are hashed, tokens are validated per session, and Postgres is used as the primary database.",
-  });
-}));
-
-app.post("/api/pegasus/visionary/tenant/app/vacating/get", asyncHandler(async (req, res) => {
-  const user = await validateAuth(req, res);
-  if (!user) return;
-  res.json({ notices: await listVacateNoticesForUser(user.id) });
-}));
 
 app.post("/api/admin/login", asyncHandler(async (req, res) => {
   const username = String(req.body?.username || "").trim();
   const password = String(req.body?.password || "").trim();
 
-  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+  const adminUser = await getAdminUserByUsername(username);
+  if (!adminUser || adminUser.status !== "ACTIVE") {
     return res.status(401).json({ error: "Invalid admin credentials" });
   }
 
-  const { selectedProperty, properties } = await resolveAdminPropertyContext(DEFAULT_PROPERTY_ID);
-  const token = createAdminSession(username, selectedProperty.id);
+  if (!verifyPassword(password, adminUser.password_hash)) {
+    return res.status(401).json({ error: "Invalid admin credentials" });
+  }
+
+  const selectedPropertyId = adminUser.role === "PROPERTY_ADMIN" ? (adminUser.property_id || "otic-1") : null;
+  const { selectedProperty, properties } = await resolveAdminPropertyContext(selectedPropertyId, adminUser.role);
+  const token = createAdminSession(username, selectedProperty.id, adminUser.role);
   setAdminSessionToken(res, token);
-  res.json({ success: true, username, token, selected_property: selectedProperty, properties });
+
+  await writeAuditLog({
+    admin_user_id: adminUser.id,
+    action: "login",
+    entity_type: "admin_user",
+    entity_id: String(adminUser.id),
+    property_id: selectedProperty.id,
+    details: { username, role: adminUser.role, property_id: selectedProperty.id },
+  });
+
+  res.json({ success: true, username, role: adminUser.role, token, selected_property: selectedProperty, properties });
 }));
 
-app.post("/api/admin/logout", (req, res) => {
+app.post("/api/admin/logout", requireAdminSession, asyncHandler(async (req, res) => {
+  await writeAuditLog({
+    admin_user_id: req.adminUser.id,
+    action: "logout",
+    entity_type: "admin_user",
+    entity_id: String(req.adminUser.id),
+    property_id: req.adminSession.property_id,
+    details: { username: req.adminUser.username, role: req.adminUser.role },
+  });
   clearAdminSession(req, res);
   res.json({ success: true });
-});
+}));
 
 app.get("/api/admin/session", requireAdminSession, asyncHandler(async (req, res) => {
-  const { properties, selectedProperty } = await resolveAdminPropertyContext(req.adminSession.property_id);
+  const { properties, selectedProperty } = await resolveAdminPropertyContext(req.adminSession.property_id, req.adminSession.role);
   res.json({
     authenticated: true,
     username: req.adminSession.username,
+    role: req.adminSession.role,
     properties,
     selected_property: selectedProperty,
     property_id: selectedProperty.id,
@@ -1058,7 +1226,11 @@ app.post("/api/admin/context/property", requireAdminSession, asyncHandler(async 
     return res.status(404).json({ error: "Property not found" });
   }
 
-  const token = createAdminSession(req.adminSession.username, property.id);
+  if (req.adminSession.role === "PROPERTY_ADMIN" && property.id !== (req.adminSession.property_id || "otic-1")) {
+    return res.status(403).json({ error: "Forbidden: This administrator cannot access a different property." });
+  }
+
+  const token = createAdminSession(req.adminSession.username, property.id, req.adminSession.role);
   setAdminSessionToken(res, token);
   res.json({
     success: true,
@@ -1070,6 +1242,80 @@ app.post("/api/admin/context/property", requireAdminSession, asyncHandler(async 
 }));
 
 app.use("/api/admin", requireAdminSession, requireAdminPropertyContext);
+
+app.get("/api/admin/alerts", requireAdminSession, asyncHandler(async (req, res) => {
+  const threadRows = (await listAdminAlertThreads()).filter((thread) => {
+    if (req.adminSession.role === "SUPER_ADMIN") {
+      return true;
+    }
+
+    return Number(thread.thread_owner_admin_user_id) === Number(req.adminUser.id);
+  });
+
+  const messages = threadRows.flatMap((thread) => listAdminAlertMessagesByThreadOwner(thread.thread_owner_admin_user_id));
+  const sortedMessages = messages.sort((left, right) => new Date(left.created_at || 0).getTime() - new Date(right.created_at || 0).getTime());
+
+  res.json({
+    messages: sortedMessages,
+    threads: threadRows.map((thread) => ({
+      ...thread,
+      thread_owner_admin_user_id: Number(thread.thread_owner_admin_user_id),
+      message_count: Number(thread.message_count || 0),
+    })),
+  });
+}));
+
+app.post("/api/admin/alerts", requireAdminSession, asyncHandler(async (req, res) => {
+  const bodyText = String(req.body?.body || "").trim();
+  if (!bodyText) {
+    return res.status(400).json({ error: "alert body is required" });
+  }
+
+  const threadOwnerId = req.body?.thread_owner_admin_user_id;
+  let threadOwnerAdmin = null;
+
+  if (req.adminSession.role === "SUPER_ADMIN") {
+    if (!threadOwnerId) {
+      return res.status(400).json({ error: "thread_owner_admin_user_id is required for replies" });
+    }
+
+    threadOwnerAdmin = await getAdminUserById(Number(threadOwnerId));
+    if (!threadOwnerAdmin) {
+      return res.status(404).json({ error: "Thread owner not found" });
+    }
+  } else {
+    threadOwnerAdmin = req.adminUser;
+  }
+
+  if (req.adminSession.role !== "SUPER_ADMIN" && Number(threadOwnerAdmin.id) !== Number(req.adminUser.id)) {
+    return res.status(403).json({ error: "Forbidden: property admins can only post to their own thread" });
+  }
+
+  const message = await addAdminAlertMessage({
+    thread_owner_admin_user_id: Number(threadOwnerAdmin.id),
+    property_id: threadOwnerAdmin.property_id || req.adminProperty?.id || null,
+    sender_admin_user_id: req.adminUser.id,
+    sender_role: req.adminUser.role,
+    sender_name: req.adminUser.full_name || req.adminUser.username,
+    body: bodyText,
+  });
+
+  const threadMessages = listAdminAlertMessagesByThreadOwner(Number(threadOwnerAdmin.id));
+  const threads = (await listAdminAlertThreads()).filter((thread) => {
+    if (req.adminSession.role === "SUPER_ADMIN") {
+      return true;
+    }
+
+    return Number(thread.thread_owner_admin_user_id) === Number(req.adminUser.id);
+  });
+
+  res.json({
+    success: true,
+    message,
+    messages: threadMessages,
+    threads,
+  });
+}));
 
 app.get("/api/admin/users", requireAdminSession, asyncHandler(async (req, res) => {
   res.json({ users: (await listUsers({ propertyId: req.adminProperty.id })).map((user) => sanitizeUser(user)) });
@@ -1101,6 +1347,114 @@ app.delete("/api/admin/users/:tenantId", requireAdminSession, asyncHandler(async
   if (!assertUserInAdminProperty(user, req)) return res.status(404).json({ error: "User not found" });
   await deleteUserById(user.id);
   res.json({ success: true });
+}));
+
+app.patch("/api/admin/users/:tenantId", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserByTenantId(req.params.tenantId);
+  if (!assertUserInAdminProperty(user, req)) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const payload = req.body || {};
+  const profilePatch = {
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    phone_number: payload.phone_number,
+    email_address: payload.email_address,
+    national_id: payload.national_id,
+    floor_number: payload.floor_number,
+    house_number: payload.house_number,
+  };
+
+  const billingPatch = {
+    rent: payload.rent,
+    water: payload.water,
+    trash: payload.trash,
+    electricity: payload.electricity,
+    deposit: payload.deposit,
+  };
+
+  let updatedUser = user;
+  if (Object.values(profilePatch).some((value) => value !== undefined)) {
+    updatedUser = await updateUserProfile(user.id, profilePatch);
+  }
+
+  const hasBillingUpdate = Object.values(billingPatch).some((value) => value !== undefined);
+  if (hasBillingUpdate) {
+    const normalizedBilling = {
+      rent: payload.rent !== undefined ? parseNonNegativeMoney(payload.rent, "rent") : String(user.rent ?? "0"),
+      water: payload.water !== undefined ? parseNonNegativeMoney(payload.water, "water") : String(user.water_balance ?? user.bill ?? "0"),
+      trash: payload.trash !== undefined ? parseNonNegativeMoney(payload.trash, "trash") : String(user.trash_balance ?? "0"),
+      electricity: payload.electricity !== undefined ? parseNonNegativeMoney(payload.electricity, "electricity") : String(user.electricity_balance ?? "0"),
+      deposit: payload.deposit !== undefined ? parseNonNegativeMoney(payload.deposit, "deposit") : String(user.deposit ?? "0"),
+    };
+
+    updatedUser = await updateUserBilling(user.id, {
+      rent: Number(normalizedBilling.rent),
+      water: Number(normalizedBilling.water),
+      trash: Number(normalizedBilling.trash),
+      electricity: Number(normalizedBilling.electricity),
+      deposit: Number(normalizedBilling.deposit),
+    });
+  }
+
+  if (payload.account_balance !== undefined) {
+    updatedUser = await updateUserProfile(user.id, { account_balance: String(payload.account_balance) });
+  }
+
+  if (payload.arrears !== undefined) {
+    updatedUser = await updateUserProfile(user.id, { arrears: String(payload.arrears) });
+  }
+
+  res.json({ user: sanitizeUser(updatedUser) });
+}));
+
+app.put("/api/admin/users/:tenantId", requireAdminSession, asyncHandler(async (req, res) => {
+  const patchHandler = async () => {
+    const user = await getUserByTenantId(req.params.tenantId);
+    if (!assertUserInAdminProperty(user, req)) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const payload = req.body || {};
+    const profilePatch = {
+      first_name: payload.first_name,
+      last_name: payload.last_name,
+      phone_number: payload.phone_number,
+      email_address: payload.email_address,
+      national_id: payload.national_id,
+      floor_number: payload.floor_number,
+      house_number: payload.house_number,
+    };
+
+    const billingPatch = {
+      rent: payload.rent,
+      water: payload.water,
+      trash: payload.trash,
+      electricity: payload.electricity,
+      deposit: payload.deposit,
+    };
+
+    let updatedUser = user;
+    if (Object.values(profilePatch).some((value) => value !== undefined)) {
+      updatedUser = await updateUserProfile(user.id, profilePatch);
+    }
+
+    const hasBillingUpdate = Object.values(billingPatch).some((value) => value !== undefined);
+    if (hasBillingUpdate) {
+      updatedUser = await updateUserBilling(user.id, {
+        rent: Number(payload.rent !== undefined ? parseNonNegativeMoney(payload.rent, "rent") : user.rent ?? 0),
+        water: Number(payload.water !== undefined ? parseNonNegativeMoney(payload.water, "water") : user.water_balance ?? user.bill ?? 0),
+        trash: Number(payload.trash !== undefined ? parseNonNegativeMoney(payload.trash, "trash") : user.trash_balance ?? 0),
+        electricity: Number(payload.electricity !== undefined ? parseNonNegativeMoney(payload.electricity, "electricity") : user.electricity_balance ?? 0),
+        deposit: Number(payload.deposit !== undefined ? parseNonNegativeMoney(payload.deposit, "deposit") : user.deposit ?? 0),
+      });
+    }
+
+    return res.json({ user: sanitizeUser(updatedUser) });
+  };
+
+  return patchHandler();
 }));
 
 async function buildAdminUsersPayload(propertyId) {
@@ -1154,6 +1508,62 @@ async function buildAdminMessagesPayload(senderType = null, propertyId = null) {
 
 async function buildAdminDocumentsPayload(propertyId = null) {
   return { documents: await listSharedDocuments({ propertyId }) };
+}
+
+async function buildAdminReportsPayload(propertyId = null, username = "Admin") {
+  const users = await listUsers({ propertyId });
+  const overview = await getPortfolioOverviewWithOverrides(propertyId);
+  const payments = await buildAdminPaymentsPayload(users, propertyId);
+  const totalArrears = users.reduce((sum, user) => sum + Number(user.arrears || 0), 0);
+  const totalCredit = users.reduce((sum, user) => sum + Math.max(0, Number(user.account_balance || 0)), 0);
+  const totalOutstanding = users.reduce((sum, user) => sum + Math.max(0, -Number(user.account_balance || 0)), 0);
+  const expectedCollection = Number(payments.summary.expected_collection_total || 0);
+  const acquiredCollection = Number(payments.summary.acquired_collection_total || 0);
+  const collectionRate = expectedCollection > 0 ? (acquiredCollection / expectedCollection) * 100 : 0;
+  const occupancyRate = overview.total_units > 0 ? (overview.occupied_units / overview.total_units) * 100 : 0;
+  const vacantUnits = Number(overview.vacant_units || 0);
+
+  return {
+    generated_by: username,
+    generated_at: new Date().toISOString(),
+    property_id: propertyId,
+    property_name: (await getPropertyById(propertyId))?.name || "Otic",
+    summary: {
+      total_tenants: users.length,
+      total_units: Number(overview.total_units || 0),
+      occupied_units: Number(overview.occupied_units || 0),
+      vacant_units: vacantUnits,
+      total_arrears: totalArrears,
+      total_credit: totalCredit,
+      total_outstanding: totalOutstanding,
+      expected_collection: expectedCollection,
+      acquired_collection: acquiredCollection,
+      variance: acquiredCollection - expectedCollection,
+      collection_rate: Number(collectionRate.toFixed(2)),
+      occupancy_rate: Number(occupancyRate.toFixed(2)),
+    },
+    data: {
+      tenant_rows: users.map((user) => ({
+        tenant_id: user.tenant_id,
+        name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Tenant",
+        unit: user.house_number || "-",
+        rent: Number(user.rent_balance || user.rent || 0),
+        arrears: Number(user.arrears || 0),
+        balance: Number(user.account_balance || 0),
+        status: String(user.status || "ACTIVE").trim() || "ACTIVE",
+      })),
+      calculations: {
+        arrears_total: totalArrears,
+        credit_total: totalCredit,
+        outstanding_total: totalOutstanding,
+        expected_collection_total: expectedCollection,
+        acquired_collection_total: acquiredCollection,
+        variance_total: acquiredCollection - expectedCollection,
+        collection_rate_percent: Number(collectionRate.toFixed(2)),
+        occupancy_rate_percent: Number(occupancyRate.toFixed(2)),
+      },
+    },
+  };
 }
 
 async function buildAdminVacatingNoticesPayload(users = null, propertyId = null) {
@@ -1290,6 +1700,14 @@ app.get("/api/admin/overview", requireAdminSession, asyncHandler(async (req, res
   res.json(await buildAdminOverviewPayload(null, req.adminProperty.id));
 }));
 
+app.get("/api/admin/reports", requireAdminSession, asyncHandler(async (req, res) => {
+  res.json(await buildAdminReportsPayload(req.adminProperty.id, req.adminSession.username));
+}));
+
+app.post("/api/admin/reports/generate", requireAdminSession, asyncHandler(async (req, res) => {
+  res.json(await buildAdminReportsPayload(req.adminProperty.id, req.adminSession.username));
+}));
+
 app.post("/api/admin/occupancy", requireAdminSession, asyncHandler(async (req, res) => {
   const occupied = Number(req.body?.occupied_units ?? NaN);
   const vacant = Number(req.body?.vacant_units ?? NaN);
@@ -1307,6 +1725,99 @@ app.post("/api/admin/occupancy", requireAdminSession, asyncHandler(async (req, r
   });
 }));
 
+app.get("/api/admin/units", requireAdminSession, asyncHandler(async (req, res) => {
+  const units = await listUnitsForProperty(req.adminProperty.id);
+  const tenantMap = new Map((await listUsers({ propertyId: req.adminProperty.id })).map((tenant) => [String(tenant.id), tenant]));
+  res.json({
+    units: units.map((unit) => ({
+      ...unit,
+      current_tenant: unit.current_tenant_id ? tenantMap.get(String(unit.current_tenant_id)) || null : null,
+      tenant_name: unit.current_tenant_id ? (() => {
+        const tenant = tenantMap.get(String(unit.current_tenant_id));
+        return tenant ? `${tenant.first_name || ""} ${tenant.last_name || ""}`.trim() || tenant.first_name || "Tenant" : null;
+      })() : null,
+    })),
+  });
+}));
+
+app.post("/api/admin/units", requireAdminSession, asyncHandler(async (req, res) => {
+  const unitCode = String(req.body?.unit_code || "").trim();
+  if (!unitCode) {
+    return res.status(400).json({ error: "unit_code is required" });
+  }
+
+  const base = await createUnit({
+    property_id: req.adminProperty.id,
+    unit_code: unitCode,
+    floor_number: req.body?.floor_number || null,
+    status: req.body?.status || "VACANT",
+    tenant_id: req.body?.tenant_id || null,
+    current_tenant_id: req.body?.current_tenant_id || null,
+    current_tenancy_id: req.body?.current_tenancy_id || null,
+    rent_amount: req.body?.rent_amount || "0",
+    notes: req.body?.notes || "",
+  });
+
+  res.json({ success: true, unit: base });
+}));
+
+app.get("/api/admin/units/:unitId/details", requireAdminSession, asyncHandler(async (req, res) => {
+  const unit = await getUnitById(req.params.unitId);
+  if (!unit || String(unit.property_id || "").trim() !== String(req.adminProperty.id)) {
+    return res.status(404).json({ error: "Unit not found" });
+  }
+
+  const tenant = unit.current_tenant_id ? await getUserById(unit.current_tenant_id) : null;
+  const tenancy = unit.current_tenancy_id ? (await listTenantTenancies(tenant?.id || -1)).find((record) => Number(record.id) === Number(unit.current_tenancy_id)) || null : null;
+
+  res.json({ unit, tenant, tenancy, history: await listTenanciesForProperty(req.adminProperty.id) });
+}));
+
+app.get("/api/admin/tenancies", requireAdminSession, asyncHandler(async (req, res) => {
+  const tenancies = await listTenanciesForProperty(req.adminProperty.id);
+  const userMap = new Map((await listUsers({ propertyId: req.adminProperty.id })).map((user) => [String(user.id), user]));
+  const unitMap = new Map((await listUnitsForProperty(req.adminProperty.id)).map((unit) => [String(unit.id), unit]));
+
+  res.json({
+    tenancies: tenancies.map((tenancy) => ({
+      ...tenancy,
+      tenant: userMap.get(String(tenancy.user_id)) || null,
+      unit: unitMap.get(String(tenancy.unit_id)) || null,
+    })),
+  });
+}));
+
+app.post("/api/admin/tenancies", requireAdminSession, asyncHandler(async (req, res) => {
+  const tenant = await getUserById(req.body?.tenant_id);
+  if (!tenant || String(tenant.property_id || "").trim() !== String(req.adminProperty.id)) {
+    return res.status(404).json({ error: "Tenant not found" });
+  }
+
+  const unit = req.body?.unit_id ? await getUnitById(req.body.unit_id) : null;
+  if (unit && String(unit.property_id || "").trim() !== String(req.adminProperty.id)) {
+    return res.status(403).json({ error: "Unit does not belong to this property" });
+  }
+
+  const tenancy = await createTenancy({
+    tenant_id: tenant.id,
+    property_id: req.adminProperty.id,
+    unit_id: unit ? unit.id : null,
+    lease_name: req.body?.lease_name || "Tenancy Agreement",
+    start_date: req.body?.start_date || new Date().toISOString(),
+    end_date: req.body?.end_date || null,
+    monthly_rent: req.body?.monthly_rent || tenant.rent || "0",
+    deposit: req.body?.deposit || "0",
+    move_in_date: req.body?.move_in_date || req.body?.start_date || new Date().toISOString(),
+    move_out_date: req.body?.move_out_date || null,
+    status: req.body?.status || "ACTIVE",
+    notes: req.body?.notes || "",
+    billing_settings: req.body?.billing_settings || null,
+    utility_settings: req.body?.utility_settings || null,
+  });
+
+  res.json({ success: true, tenancy });
+}));
+
 app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandler(async (req, res) => {
   const user = await getUserByTenantId(req.params.tenantId);
   if (!assertUserInAdminProperty(user, req)) {
@@ -1320,6 +1831,7 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandle
   const transactions = await listTransactionsForUser(user.id);
   const arrears = await listArrearsForUser(user.id);
   const lease = await getActiveLeaseForUser(user.id);
+  const tenancyHistory = await listTenantTenancies(user.id);
   const totalRepairCost = maintenance.reduce(
     (sum, item) => sum + (isClosedTicketStatus(item.status) ? Number(item.repair_cost || 0) : 0),
     0
@@ -1331,11 +1843,12 @@ app.get("/api/admin/tenants/:tenantId/details", requireAdminSession, asyncHandle
       unread_messages: messages.filter((item) => item.status === "UNREAD").length,
       open_tickets: maintenance.filter((item) => !isClosedTicketStatus(item.status)).length,
       pending_notices: notices.filter((item) => item.status === "Pending").length,
-      pending_payments: payments.filter((item) => item.status === "PENDING_CONFIRMATION").length,
+      pending_payments: payments.filter((item) => paymentStatusOpen(item?.status) || paymentStatusNeedsAdminReview(item?.status)).length,
       total_repair_cost: totalRepairCost,
     },
     bills: await getTenantBillBreakdown(user),
     lease,
+    tenancy_history: tenancyHistory,
     messages,
     maintenance,
     notices,
@@ -1609,6 +2122,210 @@ app.post("/api/admin/payments/config", requireAdminSession, asyncHandler(async (
   });
 }));
 
+app.get("/api/admin/payments/statement", requireAdminSession, asyncHandler(async (req, res) => {
+  let monthKey;
+  try {
+    monthKey = parseLedgerMonthKey(req.query.month || getCurrentLedgerMonthKey());
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const floorNumber = normalizeFloorValue(req.query.floor);
+  res.json(await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, floorNumber));
+}));
+
+app.patch("/api/admin/payments/statement/:userId", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserById(req.params.userId);
+  if (!assertUserInAdminProperty(user, req)) {
+    return res.status(404).json({ error: "Tenant not found" });
+  }
+
+  let monthKey;
+  let deposit;
+  let rentBill;
+  let openingBalanceOverride;
+  try {
+    monthKey = parseLedgerMonthKey(req.body?.month_key || getCurrentLedgerMonthKey());
+    deposit = parseOptionalLedgerNumber(req.body?.deposit, "deposit", { allowNegative: false, emptyValue: 0 });
+    rentBill = parseOptionalLedgerNumber(req.body?.rent_bill, "rent_bill", { allowNegative: false, emptyValue: 0 });
+    openingBalanceOverride = parseOptionalLedgerNumber(req.body?.opening_balance_override, "opening_balance_override", {
+      allowNegative: true,
+      emptyValue: null,
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  await upsertMonthlyStatement(user.id, {
+    property_id: req.adminProperty.id,
+    month_key: monthKey,
+    opening_balance_override: Object.prototype.hasOwnProperty.call(req.body || {}, "opening_balance_override")
+      ? openingBalanceOverride
+      : undefined,
+    deposit: Object.prototype.hasOwnProperty.call(req.body || {}, "deposit") ? deposit : undefined,
+    rent_bill: Object.prototype.hasOwnProperty.call(req.body || {}, "rent_bill") ? rentBill : undefined,
+    remarks: Object.prototype.hasOwnProperty.call(req.body || {}, "remarks") ? String(req.body?.remarks || "") : undefined,
+  });
+
+  const payload = await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, normalizeFloorValue(user.floor_number));
+  res.json({
+    success: true,
+    row: payload.rows.find((row) => Number(row.user_id) === Number(user.id)) || null,
+  });
+}));
+
+app.post("/api/admin/payments/statement/:userId/payments", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserById(req.params.userId);
+  if (!assertUserInAdminProperty(user, req)) {
+    return res.status(404).json({ error: "Tenant not found" });
+  }
+
+  let monthKey;
+  let amount;
+  try {
+    monthKey = parseLedgerMonthKey(req.body?.month_key || getCurrentLedgerMonthKey());
+    amount = parseOptionalLedgerNumber(req.body?.amount, "amount", { allowNegative: false, emptyValue: 0 });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ error: "amount must be greater than zero" });
+  }
+
+  await addMonthlyPaymentEntry(user.id, {
+    property_id: req.adminProperty.id,
+    month_key: monthKey,
+    amount,
+    payment_date: req.body?.payment_date ? new Date(req.body.payment_date).toISOString() : new Date().toISOString(),
+    receipt_number: String(req.body?.receipt_number || "").trim() || null,
+    remarks: String(req.body?.remarks || "").trim(),
+  });
+
+  const payload = await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, normalizeFloorValue(user.floor_number));
+  res.json({
+    success: true,
+    row: payload.rows.find((row) => Number(row.user_id) === Number(user.id)) || null,
+  });
+}));
+
+app.get("/api/admin/utilities", requireAdminSession, asyncHandler(async (req, res) => {
+  let monthKey;
+  try {
+    monthKey = parseLedgerMonthKey(req.query.month || getCurrentLedgerMonthKey());
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const floorNumber = normalizeFloorValue(req.query.floor);
+  res.json(await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, floorNumber));
+}));
+
+app.post("/api/admin/utilities/water-rate", requireAdminSession, asyncHandler(async (req, res) => {
+  let rate;
+  try {
+    rate = parseOptionalLedgerNumber(req.body?.rate, "rate", { allowNegative: false, emptyValue: 0 });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  await setScopedAdminSetting(req.adminProperty.id, "utility_water_rate", rate);
+  res.json({ success: true, rate });
+}));
+
+app.put("/api/admin/utilities/water/:userId", requireAdminSession, asyncHandler(async (req, res) => {
+  const user = await getUserById(req.params.userId);
+  if (!assertUserInAdminProperty(user, req)) {
+    return res.status(404).json({ error: "Tenant not found" });
+  }
+
+  let monthKey;
+  let previousReading;
+  let latestReading;
+  const propertyWaterRate = Number((await getScopedAdminSetting(req.adminProperty.id, "utility_water_rate", "0")) || 0);
+  try {
+    monthKey = parseLedgerMonthKey(req.body?.month_key || getCurrentLedgerMonthKey());
+    previousReading = parseOptionalLedgerNumber(req.body?.previous_reading, "previous_reading", { allowNegative: false, emptyValue: 0 });
+    latestReading = parseOptionalLedgerNumber(req.body?.latest_reading, "latest_reading", { allowNegative: false, emptyValue: 0 });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  if (latestReading < previousReading) {
+    return res.status(400).json({ error: "latest_reading must be greater than or equal to previous_reading" });
+  }
+
+  await upsertMonthlyWaterReading(user.id, {
+    property_id: req.adminProperty.id,
+    month_key: monthKey,
+    previous_reading: previousReading,
+    latest_reading: latestReading,
+    rate: propertyWaterRate,
+  });
+
+  const payload = await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, normalizeFloorValue(user.floor_number));
+  res.json({
+    success: true,
+    row: payload.rows.find((row) => Number(row.user_id) === Number(user.id)) || null,
+  });
+}));
+
+app.post("/api/admin/utilities/garbage", requireAdminSession, asyncHandler(async (req, res) => {
+  let monthKey;
+  let amount;
+  try {
+    monthKey = parseLedgerMonthKey(req.body?.month_key || getCurrentLedgerMonthKey());
+    amount = parseOptionalLedgerNumber(req.body?.amount, "amount", { allowNegative: false, emptyValue: 0 });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const scope = String(req.body?.scope || "tenant").trim().toLowerCase();
+  const users = await listUsers({ propertyId: req.adminProperty.id });
+  let scopedUsers = [];
+
+  if (scope === "tenant") {
+    const user = await getUserById(req.body?.user_id);
+    if (!assertUserInAdminProperty(user, req)) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+    scopedUsers = [user];
+  } else if (scope === "floor") {
+    const floorNumber = normalizeFloorValue(req.body?.floor_number);
+    if (!floorNumber) {
+      return res.status(400).json({ error: "floor_number is required for floor scope" });
+    }
+    scopedUsers = users.filter((user) => String(user.floor_number || "").trim() === floorNumber);
+  } else if (scope === "all") {
+    scopedUsers = users;
+  } else {
+    return res.status(400).json({ error: "scope must be tenant, floor, or all" });
+  }
+
+  if (!scopedUsers.length) {
+    return res.status(400).json({ error: "No tenants matched the selected garbage scope" });
+  }
+
+  await setMonthlyGarbageAmount({
+    property_id: req.adminProperty.id,
+    month_key: monthKey,
+    user_ids: scopedUsers.map((user) => user.id),
+    amount,
+  });
+
+  const floorForRefresh = scope === "tenant"
+    ? normalizeFloorValue(scopedUsers[0]?.floor_number)
+    : scope === "floor"
+      ? normalizeFloorValue(req.body?.floor_number)
+      : normalizeFloorValue(req.body?.active_floor_number);
+  const payload = await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, floorForRefresh);
+  res.json({
+    success: true,
+    applied_count: scopedUsers.length,
+    rows: payload.rows,
+  });
+}));
+
 app.post("/api/admin/payments/:id/review", requireAdminSession, asyncHandler(async (req, res) => {
   const payment = await getPaymentRequestById(req.params.id);
   if (!payment) {
@@ -1623,6 +2340,9 @@ app.post("/api/admin/payments/:id/review", requireAdminSession, asyncHandler(asy
   const status = String(req.body?.status || "").trim();
   if (!["APPROVED", "DISAPPROVED"].includes(status)) {
     return res.status(400).json({ error: "status must be APPROVED or DISAPPROVED" });
+  }
+  if (!paymentStatusNeedsAdminReview(payment.status)) {
+    return res.status(400).json({ error: "Only tenant-submitted manual confirmations can be reviewed here." });
   }
   if (["APPROVED", "DISAPPROVED"].includes(String(payment.status || "").toUpperCase())) {
     return res.status(400).json({ error: "Payment has already been reviewed" });
@@ -1724,6 +2444,10 @@ app.post("/api/admin/tickets/:id/status", requireAdminSession, asyncHandler(asyn
   res.json({ success: true, ticket });
 }));
 
+app.get("/", (req, res) => {
+  res.redirect("/secure-admin/login");
+});
+
 app.get("/secure-admin", (req, res) => {
   setNoStore(res);
   res.sendFile(path.join(__dirname, "admin.html"));
@@ -1735,7 +2459,7 @@ app.get("/secure-admin/login", (req, res) => {
 });
 
 app.get("/admin", (req, res) => {
-  res.redirect("/");
+  res.redirect("/secure-admin/login");
 });
 
 app.get("/api/health", (req, res) => {
@@ -1743,6 +2467,14 @@ app.get("/api/health", (req, res) => {
     ok: true,
     database_provider: DATABASE_PROVIDER,
   });
+});
+
+app.get("/404", (req, res) => {
+  res.status(404).sendFile(path.join(__dirname, "404.html"));
+});
+
+app.get("/500", (req, res) => {
+  res.status(500).sendFile(path.join(__dirname, "500.html"));
 });
 
 app.use(express.static(__dirname));
@@ -1759,7 +2491,7 @@ app.use((error, req, res, next) => {
     return;
   }
 
-  res.status(500).send("Internal Server Error");
+  res.status(500).sendFile(path.join(__dirname, "500.html"));
 });
 
 app.use("/api", (req, res) => {
@@ -1767,7 +2499,7 @@ app.use("/api", (req, res) => {
 });
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.status(404).sendFile(path.join(__dirname, "404.html"));
 });
 
 function checkPortAvailable(port) {

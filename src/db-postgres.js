@@ -231,6 +231,38 @@ export async function initDb() {
     )
   `);
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS units (
+      id BIGSERIAL PRIMARY KEY,
+      property_id TEXT,
+      unit_code TEXT UNIQUE NOT NULL,
+      floor_number TEXT,
+      status TEXT DEFAULT 'VACANT',
+      tenant_id TEXT,
+      current_tenant_id BIGINT,
+      current_tenancy_id BIGINT,
+      rent_amount TEXT DEFAULT '0',
+      occupancy_status TEXT DEFAULT 'VACANT',
+      balance TEXT DEFAULT '0',
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      FOREIGN KEY (property_id) REFERENCES properties(id)
+    )
+  `);
+  await ensureColumn("units", "property_id", "TEXT");
+  await ensureColumn("units", "current_tenant_id", "BIGINT");
+  await ensureColumn("units", "current_tenancy_id", "BIGINT");
+  await ensureColumn("units", "rent_amount", "TEXT DEFAULT '0'");
+  await ensureColumn("units", "occupancy_status", "TEXT DEFAULT 'VACANT'");
+  await ensureColumn("units", "balance", "TEXT DEFAULT '0'");
+  await ensureColumn("units", "unit_number", "TEXT");
+  await query(`
+    UPDATE units
+    SET property_id = 'otic-1'
+    WHERE NULLIF(BTRIM(property_id), '') IS NULL
+  `);
+
   const superAdminUsername = String(process.env.ADMIN_USERNAME || "superadmin").trim() || "superadmin";
   const superAdminPassword = String(process.env.ADMIN_PASSWORD || "otic12").trim() || "otic12";
   const otic1AdminUsername = String(process.env.OTIC1_ADMIN_USERNAME || "adminotic1").trim() || "adminotic1";

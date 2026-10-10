@@ -564,14 +564,16 @@
       }
 
       function renderOverviewMonthControls() {
-        const [currentYear, currentMonth] = String(state.overviewMonthKey).split('-').map(Number);
+        const now = new Date();
+        const currentYear = Number(String(state.overviewMonthKey).split('-')[0] || now.getFullYear());
+        const currentMonth = Number(String(state.overviewMonthKey).split('-')[1] || (now.getMonth() + 1));
         const monthOptions = Array.from({ length: 12 }, (_, index) => {
           const monthValue = index + 1;
-          const label = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(currentYear || new Date().getUTCFullYear(), index, 1)));
+          const label = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(Date.UTC(currentYear || now.getUTCFullYear(), index, 1)));
           return `<option value="${monthValue}" ${monthValue === currentMonth ? 'selected' : ''}>${label}</option>`;
         }).join('');
-        const yearNow = new Date().getFullYear();
-        const yearOptions = Array.from({ length: 9 }, (_, idx) => yearNow - 3 + idx)
+        const yearNow = now.getFullYear();
+        const yearOptions = Array.from({ length: 6 }, (_, idx) => yearNow + idx)
           .map((yearValue) => `<option value="${yearValue}" ${yearValue === currentYear ? 'selected' : ''}>${yearValue}</option>`)
           .join('');
         document.getElementById('overviewMonthSelect').innerHTML = monthOptions;
@@ -900,15 +902,18 @@
         document.getElementById('paymentPropertyBadge').textContent = propertyName();
         document.getElementById('utilitiesPropertyBadge').textContent = propertyName();
         const { year, month } = getLedgerMonthParts();
+        const now = new Date();
+        const selectedYear = Number(year || now.getFullYear());
+        const selectedMonth = Number(month || (now.getMonth() + 1));
         const monthOptions = Array.from({ length: 12 }, (_, index) => {
           const monthValue = index + 1;
-          const dateLabel = new Date(Date.UTC(year || new Date().getUTCFullYear(), index, 1));
+          const dateLabel = new Date(Date.UTC(selectedYear || now.getUTCFullYear(), index, 1));
           const label = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(dateLabel);
-          return `<option value="${monthValue}" ${monthValue === month ? 'selected' : ''}>${label}</option>`;
+          return `<option value="${monthValue}" ${monthValue === selectedMonth ? 'selected' : ''}>${label}</option>`;
         }).join('');
-        const currentYear = new Date().getFullYear();
-        const years = Array.from({ length: 9 }, (_, idx) => currentYear - 3 + idx);
-        const yearOptions = years.map((item) => `<option value="${item}" ${item === year ? 'selected' : ''}>${item}</option>`).join('');
+        const currentYear = now.getFullYear();
+        const years = Array.from({ length: 6 }, (_, idx) => currentYear + idx);
+        const yearOptions = years.map((item) => `<option value="${item}" ${item === selectedYear ? 'selected' : ''}>${item}</option>`).join('');
 
         ['payment', 'utilities'].forEach((context) => {
           document.getElementById(`${context}MonthSelect`).innerHTML = monthOptions;

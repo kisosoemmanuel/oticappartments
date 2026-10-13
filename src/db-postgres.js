@@ -377,53 +377,43 @@ export async function initDb() {
   await query(`
     CREATE TABLE IF NOT EXISTS payment_requests (
       id BIGSERIAL PRIMARY KEY,
-      property_id TEXT,
-      unit_code TEXT UNIQUE NOT NULL,
-      floor_number TEXT,
-      status TEXT DEFAULT 'VACANT',
-      tenant_id TEXT,
-      current_tenant_id BIGINT,
-      current_tenancy_id BIGINT,
-      rent_amount TEXT DEFAULT '0',
-      occupancy_status TEXT DEFAULT 'VACANT',
-      balance TEXT DEFAULT '0',
-      notes TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      FOREIGN KEY (property_id) REFERENCES properties(id)
-    )
-  `);
-  await ensureColumn("units", "property_id", "TEXT");
-  await ensureColumn("units", "current_tenant_id", "BIGINT");
-  await ensureColumn("units", "current_tenancy_id", "BIGINT");
-  await ensureColumn("units", "rent_amount", "TEXT DEFAULT '0'");
-  await ensureColumn("units", "occupancy_status", "TEXT DEFAULT 'VACANT'");
-  await ensureColumn("units", "balance", "TEXT DEFAULT '0'");
-  await ensureColumn("units", "unit_number", "TEXT");
-  await query(`
-    UPDATE units
-    SET property_id = 'otic-1'
-    WHERE NULLIF(BTRIM(property_id), '') IS NULL
-  `);
-
-  await query(`
-    CREATE TABLE IF NOT EXISTS payment_requests (
-      id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       method TEXT NOT NULL,
       amount TEXT NOT NULL,
       phone_number TEXT,
       reference TEXT,
+      payment_for TEXT,
       payment_time TIMESTAMPTZ,
       status TEXT DEFAULT 'PENDING',
       note TEXT,
+      provider TEXT,
+      provider_request_id TEXT,
+      provider_checkout_id TEXT,
+      provider_result_code TEXT,
+      provider_result_description TEXT,
+      provider_metadata_json TEXT,
+      prompted_at TIMESTAMPTZ,
+      callback_received_at TIMESTAMPTZ,
+      auto_applied_at TIMESTAMPTZ,
+      completed_at TIMESTAMPTZ,
+      tenant_reference TEXT,
+      tenant_payment_time TIMESTAMPTZ,
+      tenant_confirmed_at TIMESTAMPTZ,
+      review_note TEXT,
+      reviewed_at TIMESTAMPTZ,
+      receipt_number TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  await ensureColumn("payment_requests", "user_id", "BIGINT");
+  await ensureColumn("payment_requests", "method", "TEXT");
+  await ensureColumn("payment_requests", "amount", "TEXT");
   await ensureColumn("payment_requests", "payment_for", "TEXT");
   await ensureColumn("payment_requests", "payment_time", "TIMESTAMPTZ");
-  await ensureColumn("payment_requests", "reviewed_at", "TIMESTAMPTZ");
+  await ensureColumn("payment_requests", "status", "TEXT DEFAULT 'PENDING'");
+  await ensureColumn("payment_requests", "note", "TEXT");
   await ensureColumn("payment_requests", "review_note", "TEXT");
+  await ensureColumn("payment_requests", "reviewed_at", "TIMESTAMPTZ");
   await ensureColumn("payment_requests", "receipt_number", "TEXT");
   await ensureColumn("payment_requests", "provider", "TEXT");
   await ensureColumn("payment_requests", "provider_request_id", "TEXT");

@@ -275,7 +275,6 @@
               <button id="resetFilters" type="button">Reset</button>
             </div>
             <div class="tenant-add-grid">
-              <label class="compact-stack"><span>Tenant Name</span><input id="newTenantName" class="text-input" type="text" placeholder="e.g. Jane Wambui" /></label>
               <label class="compact-stack"><span>Floor</span><input id="newTenantFloor" class="text-input" type="text" placeholder="0, 1, 2..." /></label>
               <label class="compact-stack"><span>Unit Number</span><input id="newTenantUnit" class="text-input" type="text" placeholder="e.g. A-103" /></label>
               <label class="compact-stack"><span>Rent</span><input id="newTenantRent" class="money-input" type="number" min="0" step="0.01" /></label>
@@ -1192,27 +1191,24 @@
       });
 
       document.getElementById('addTenantBtn').addEventListener('click', async () => {
-        const name = document.getElementById('newTenantName').value.trim();
         const floor = document.getElementById('newTenantFloor').value.trim();
         const unit = document.getElementById('newTenantUnit').value.trim();
         const rent = Number(document.getElementById('newTenantRent').value || 0);
         const deposit = Number(document.getElementById('newTenantDeposit').value || 0);
         const phone = document.getElementById('newTenantPhone').value.trim();
-        if (!name || !floor || !unit || !phone) {
-          setStatus('Fill tenant name, floor, unit number, and phone number.', true);
+        if (!floor || !unit || !phone) {
+          setStatus('Fill floor, unit number, and phone number.', true);
           return;
         }
 
-        const [firstName, ...rest] = name.split(/\s+/);
-        const lastName = rest.join(' ');
         const accountSeed = `${Date.now()}${Math.floor(Math.random() * 1e3)}`;
 
         try {
           await api('/api/admin/users', {
             method: 'POST',
             body: {
-              first_name: firstName,
-              last_name: lastName,
+              first_name: 'Tenant',
+              last_name: `-${unit}`,
               account_number: `ACC-${accountSeed}`,
               floor_number: floor,
               house_number: unit,
@@ -1222,7 +1218,6 @@
             },
           });
           await loadDashboard();
-          document.getElementById('newTenantName').value = '';
           document.getElementById('newTenantFloor').value = '';
           document.getElementById('newTenantUnit').value = '';
           document.getElementById('newTenantRent').value = '';

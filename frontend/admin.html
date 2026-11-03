@@ -191,7 +191,22 @@
         border-color: #eaa126;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
-      @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .two-col { grid-template-columns: 1fr; } .topbar { flex-direction: column; align-items: flex-start; } }
+      @media (max-width: 900px) {
+        .app { grid-template-columns: 1fr; }
+        .sidebar { padding: 14px 12px 18px; }
+        .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .main { padding: 16px; }
+        .topbar { flex-direction: column; align-items: flex-start; }
+        .two-col { grid-template-columns: 1fr; }
+        .tenant-add-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 600px) {
+        .nav { grid-template-columns: 1fr; }
+        .filters { flex-direction: column; }
+        .filters input, .filters select, .search-wrap { width: 100%; }
+        .tenant-add-grid, .detail-grid, .month-year-wrap, .inline-form, .document-forms { grid-template-columns: 1fr; }
+        .panel { padding: 14px; }
+      }
     </style>
   </head>
   <body>
@@ -272,7 +287,6 @@
               <select id="tenantFloorFilter" class="modern-select">
                 <option value="">Select floor</option>
               </select>
-              <button id="resetFilters" type="button">Reset</button>
             </div>
             <div class="tenant-add-grid">
               <label class="compact-stack"><span>Floor</span><input id="newTenantFloor" class="text-input" type="text" placeholder="0, 1, 2..." /></label>
@@ -371,7 +385,6 @@
                     <th>Tenant Name</th>
                     <th>House No.</th>
                     <th>Bal. B/F</th>
-                    <th>Deposit</th>
                     <th>Water Bill</th>
                     <th>Garbage</th>
                     <th>Rent Bill</th>
@@ -814,6 +827,7 @@
               <label class="field-stack"><span>Tenant ID</span><input class="text-input" name="tenant_id" value="${escapeHtml(tenant.tenant_id || '')}" disabled /></label>
             </div>
             <div class="drawer-actions">
+              <button type="button" class="danger-btn js-delete-tenant" data-tenant-id="${escapeHtml(tenant.tenant_id || tenant.id)}">Delete tenant</button>
               <button type="button" class="secondary-btn js-save-tenant" data-tenant-id="${tenant.id}" data-tenant-tenant-id="${escapeHtml(tenant.tenant_id || tenant.id)}">Save changes</button>
               <button type="button" class="close-btn" data-action="close-tenant">Cancel</button>
             </div>
@@ -852,17 +866,26 @@
           return;
         }
 
+        const safeName = escapeHtml(doc.name || 'Document');
+        const openLink = `<a href="${doc.url}" target="_blank" rel="noreferrer" style="color: var(--primary); font-weight:700;">Open or download file</a>`;
+
         if (/\.(png|jpe?g|gif|webp|svg)$/i.test(doc.url)) {
-          previewPane.innerHTML = `<img src="${doc.url}" alt="${escapeHtml(doc.name || 'Document')}" />`;
+          previewPane.innerHTML = `<img src="${doc.url}" alt="${safeName}" />`;
           return;
         }
 
         if (/\.pdf$/i.test(doc.url)) {
-          previewPane.innerHTML = `<iframe src="${doc.url}" title="${escapeHtml(doc.name || 'Document')}"></iframe>`;
+          previewPane.innerHTML = `<iframe src="${doc.url}" title="${safeName}"></iframe>`;
           return;
         }
 
-        previewPane.innerHTML = `<div><h3>${escapeHtml(doc.name || 'Document')}</h3><p>Preview unavailable for this file type.</p><a href="${doc.url}" target="_blank" rel="noreferrer" style="color: var(--primary); font-weight:700;">Open file</a></div>`;
+        const supportedOfficeTypes = /\.(doc|docx|xls|xlsx|ppt|pptx|csv|txt|rtf)$/i;
+        if (supportedOfficeTypes.test(doc.url)) {
+          previewPane.innerHTML = `<div><h3>${safeName}</h3><p>This file type cannot be previewed directly in-browser, but it is available to open or download.</p>${openLink}</div>`;
+          return;
+        }
+
+        previewPane.innerHTML = `<div><h3>${safeName}</h3><p>Preview unavailable for this file type.</p>${openLink}</div>`;
       }
 
       function renderReports() {
@@ -945,15 +968,15 @@
               const paymentHistory = row.payment_entries?.length
                 ? row.payment_entries.map((entry) => `<tr><td>${formatDate(entry.payment_date)}</td><td>${formatMoney(entry.amount)}</td><td>${escapeHtml(entry.receipt_number || '—')}</td><td>${escapeHtml(entry.remarks || '—')}</td></tr>`).join('')
                 : '<tr><td colspan="4">No payments recorded for this month.</td></tr>';
+              const fixedRentBill = Number(row.rent_bill || row.rent || 0);
               return `
                 <tr class="payment-statement-row" data-user-id="${row.user_id}" data-water-bill="${row.water_bill}" data-garbage="${row.garbage_amount}" data-payment-total="${row.payment_total}">
                   <td>${escapeHtml(row.tenant_name)}</td>
                   <td>${escapeHtml(row.house_number || '-')}</td>
                   <td><input class="money-input js-payment-preview" data-field="opening_balance_override" type="number" step="0.01" value="${row.opening_balance}" ${row.opening_balance_locked ? 'disabled' : ''} /></td>
-                  <td><input class="money-input js-payment-preview" data-field="deposit" type="number" min="0" step="0.01" value="${row.deposit}" /></td>
                   <td><div class="cell-stack"><span>${formatMoney(row.water_bill)}</span><span class="hint-text">From Utilities</span></div></td>
                   <td><div class="cell-stack"><span>${formatMoney(row.garbage_amount)}</span><span class="hint-text">From Utilities</span></div></td>
-                  <td><input class="money-input js-payment-preview" data-field="rent_bill" type="number" min="0" step="0.01" value="${row.rent_bill}" /></td>
+                  <td><input class="money-input js-payment-preview" data-field="rent_bill" type="number" min="0" step="0.01" value="${fixedRentBill}" disabled /></td>
                   <td class="js-dues">${formatMoney(row.dues)}</td>
                   <td><div class="cell-stack"><strong>${formatMoney(row.payment_total)}</strong><button type="button" class="secondary-btn js-toggle-payments" data-user-id="${row.user_id}">${isOpen ? 'Hide' : 'Payments'}</button></div></td>
                   <td class="nowrap">${escapeHtml(formatDate(row.latest_payment_date))}</td>
@@ -970,7 +993,7 @@
                   </td>
                 </tr>
                 <tr class="payment-row-detail" ${isOpen ? '' : 'hidden'}>
-                  <td colspan="13">
+                  <td colspan="12">
                     <div class="detail-card">
                       <h3>Payment history for ${escapeHtml(row.tenant_name)}</h3>
                       <div class="table-wrap" style="margin-bottom: 14px;">
@@ -1040,10 +1063,9 @@
 
       function updatePaymentRowPreview(rowElement) {
         const openingInput = rowElement.querySelector('[data-field="opening_balance_override"]');
-        const depositInput = rowElement.querySelector('[data-field="deposit"]');
         const rentInput = rowElement.querySelector('[data-field="rent_bill"]');
         const opening = Number(openingInput?.value || 0);
-        const deposit = Number(depositInput?.value || 0);
+        const deposit = 0;
         const waterBill = Number(rowElement.dataset.waterBill || 0);
         const garbageAmount = Number(rowElement.dataset.garbage || 0);
         const rentBill = Number(rentInput?.value || 0);
@@ -1180,13 +1202,6 @@
 
       tenantFloorFilter.addEventListener('change', () => {
         state.tenantFloor = tenantFloorFilter.value;
-        renderTenantTable();
-      });
-
-      document.getElementById('resetFilters').addEventListener('click', () => {
-        tenantSearch.value = '';
-        state.tenantSearch = '';
-        renderTenantFloorOptions();
         renderTenantTable();
       });
 
@@ -1367,6 +1382,24 @@
           return;
         }
 
+        const deleteTenantButton = event.target.closest('.js-delete-tenant');
+        if (deleteTenantButton) {
+          const tenantKey = deleteTenantButton.dataset.tenantId;
+          if (!tenantKey || !window.confirm('Delete this tenant? This action cannot be undone.')) {
+            return;
+          }
+
+          try {
+            await api(`/api/admin/users/${encodeURIComponent(tenantKey)}`, { method: 'DELETE' });
+            await loadDashboard();
+            closeTenantDrawer();
+            setStatus('Tenant deleted.');
+          } catch (error) {
+            setStatus(error.message || 'Unable to delete tenant.', true);
+          }
+          return;
+        }
+
         const paymentToggle = event.target.closest('.js-toggle-payments');
         if (paymentToggle) {
           state.paymentOpenUserId = Number(state.paymentOpenUserId) === Number(paymentToggle.dataset.userId) ? null : Number(paymentToggle.dataset.userId);
@@ -1381,8 +1414,6 @@
           const openingInput = rowElement.querySelector('[data-field="opening_balance_override"]');
           const payload = {
             month_key: state.ledger.month_key,
-            deposit: rowElement.querySelector('[data-field="deposit"]').value,
-            rent_bill: rowElement.querySelector('[data-field="rent_bill"]').value,
             remarks: rowElement.querySelector('[data-field="remarks"]').value,
           };
           if (openingInput && !openingInput.disabled) {

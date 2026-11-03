@@ -1098,7 +1098,9 @@ function buildMonthlyTimeline(user, targetMonthKey, statementMap, waterMap, paym
     const waterBill = consumption * rate;
     const deposit = toLedgerNumber(statement?.deposit);
     const garbageAmount = toLedgerNumber(statement?.garbage_amount);
-    const rentBill = toLedgerNumber(statement?.rent_bill);
+    const tenantRent = toLedgerNumber(user.rent || user.rent_balance || 0);
+    const statementRentBill = toLedgerNumber(statement?.rent_bill);
+    const rentBill = statementRentBill > 0 ? statementRentBill : tenantRent;
     const paymentTotal = paymentEntries.reduce((sum, entry) => sum + toLedgerNumber(entry.amount), 0);
     const dues = computeDues({ openingBalance, deposit, waterBill, garbageAmount, rentBill });
     const balance = paymentTotal - dues;

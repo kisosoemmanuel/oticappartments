@@ -615,11 +615,15 @@ async function buildMonthlyLedgerPayload(propertyId, monthKey, floorNumber = nul
   const selectedFloor = floorNumber || null;
   const ledger = selectedFloor ? await listMonthlyTenantLedger({ propertyId, monthKey, floorNumber: selectedFloor }) : initial;
   const waterRate = Number((await getScopedAdminSetting(propertyId, "utility_water_rate", "0")) || 0);
+  const specialSharedFloorConsumption = monthKey === "2026-11" && String(propertyId || "").trim() === "otic-1"
+    ? Number((await getScopedAdminSetting(propertyId, `shared_water_consumption_${monthKey}_first_floor`, "0")) || 0)
+    : 0;
 
   const rows = ledger.rows.map((row) => {
     const previousReading = Number(row.previous_meter_reading || 0);
     const latestReading = Number(row.latest_meter_reading || 0);
-    const consumption = latestReading - previousReading;
+    const rowIsSharedFloor = monthKey === "2026-11" && String(propertyId || "").trim() === "otic-1" && String(row.floor_number || "").trim() === "1";
+    const consumption = rowIsSharedFloor ? specialSharedFloorConsumption : (latestReading - previousReading);
     const effectiveRate = Number.isFinite(waterRate) ? waterRate : Number(row.rate || 0);
     const waterBill = consumption * effectiveRate;
     const dues = Number(row.dues || 0) - Number(row.water_bill || 0) + waterBill;
@@ -629,6 +633,7 @@ async function buildMonthlyLedgerPayload(propertyId, monthKey, floorNumber = nul
       ...row,
       rate: effectiveRate,
       water_bill: waterBill,
+      consumption,
       dues,
       balance,
     };
@@ -2243,26 +2248,46 @@ app.put("/api/admin/utilities/water/:userId", requireAdminSession, asyncHandler(
   let monthKey;
   let previousReading;
   let latestReading;
+  let consumption;
   const propertyWaterRate = Number((await getScopedAdminSetting(req.adminProperty.id, "utility_water_rate", "0")) || 0);
   try {
     monthKey = parseLedgerMonthKey(req.body?.month_key || getCurrentLedgerMonthKey());
     previousReading = parseOptionalLedgerNumber(req.body?.previous_reading, "previous_reading", { allowNegative: false, emptyValue: 0 });
     latestReading = parseOptionalLedgerNumber(req.body?.latest_reading, "latest_reading", { allowNegative: false, emptyValue: 0 });
+    consumption = parseOptionalLedgerNumber(req.body?.consumption, "consumption", { allowNegative: false, emptyValue: 0 });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
 
-  if (latestReading < previousReading) {
-    return res.status(400).json({ error: "latest_reading must be greater than or equal to previous_reading" });
-  }
+  const isSharedFloorNovember = monthKey === "2026-11" && String(req.adminProperty.id || "").trim() === "otic-1" && String(user.floor_number || "").trim() === "1";
+  if (isSharedFloorNovember) {
+    const sharedConsumption = consumption > 0 ? consumption : Math.max(latestReading - previousReading, 0);
+    await setScopedAdminSetting(req.adminProperty.id, `shared_water_consumption_${monthKey}_first_floor`, String(sharedConsumption));
+    const floorUsers = (await listUsers({ propertyId: req.adminProperty.id })).filter(
+      (tenant) => String(tenant.floor_number || "").trim() === "1"
+    );
+    for (const floorUser of floorUsers) {
+      await upsertMonthlyWaterReading(floorUser.id, {
+        property_id: req.adminProperty.id,
+        month_key: monthKey,
+        previous_reading: 0,
+        latest_reading: sharedConsumption,
+        rate: propertyWaterRate,
+      });
+    }
+  } else {
+    if (latestReading < previousReading) {
+      return res.status(400).json({ error: "latest_reading must be greater than or equal to previous_reading" });
+    }
 
-  await upsertMonthlyWaterReading(user.id, {
-    property_id: req.adminProperty.id,
-    month_key: monthKey,
-    previous_reading: previousReading,
-    latest_reading: latestReading,
-    rate: propertyWaterRate,
-  });
+    await upsertMonthlyWaterReading(user.id, {
+      property_id: req.adminProperty.id,
+      month_key: monthKey,
+      previous_reading: previousReading,
+      latest_reading: latestReading,
+      rate: propertyWaterRate,
+    });
+  }
 
   const payload = await buildMonthlyLedgerPayload(req.adminProperty.id, monthKey, normalizeFloorValue(user.floor_number));
   res.json({

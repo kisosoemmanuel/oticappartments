@@ -992,7 +992,7 @@ function buildMonthlyTimeline(user, targetMonthKey, statementMap, waterMap, paym
       ? toLedgerNumber(statement.opening_balance_override)
       : closingBalance !== null
         ? closingBalance
-        : toLedgerNumber(user.account_balance);
+        : 0;
     const previousReading = toLedgerNumber(water?.previous_reading);
     const latestReading = toLedgerNumber(water?.latest_reading);
     const rate = toLedgerNumber(water?.rate);

@@ -1026,12 +1026,19 @@
         document.getElementById('garbageUtilityPanel').hidden = state.utilityTab !== 'garbage';
 
         const rows = state.ledger.rows || [];
+        const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
+        const waterHeader = document.querySelector('#waterUtilityPanel thead tr');
+        if (waterHeader) {
+          waterHeader.innerHTML = isNovember2026
+            ? '<th>Tenant</th><th>House No.</th><th>Latest Meter Reading</th><th>Consumption</th><th>Rate</th><th>Water Bill</th>'
+            : '<th>Tenant</th><th>House No.</th><th>Previous Meter Reading</th><th>Latest Meter Reading</th><th>Consumption</th><th>Rate</th><th>Water Bill</th>';
+        }
         document.getElementById('waterTableBody').innerHTML = rows.length
           ? rows.map((row) => `
               <tr data-water-user-id="${row.user_id}">
                 <td>${escapeHtml(row.tenant_name)}</td>
                 <td>${escapeHtml(row.house_number || '-')}</td>
-                <td><input class="money-input js-water-preview" data-water-field="previous_reading" type="number" min="0" step="0.01" value="${row.previous_meter_reading}" /></td>
+                ${isNovember2026 ? '' : '<td><input class="money-input js-water-preview" data-water-field="previous_reading" type="number" min="0" step="0.01" value="${row.previous_meter_reading}" /></td>'}
                 <td><input class="money-input js-water-preview" data-water-field="latest_reading" type="number" min="0" step="0.01" value="${row.latest_meter_reading}" /></td>
                 <td class="js-water-consumption">${row.consumption}</td>
                 <td><input class="money-input" data-water-field="rate" type="number" min="0" step="0.01" value="${row.rate}" disabled /></td>
@@ -1043,7 +1050,7 @@
                 </td>
               </tr>
             `).join('')
-          : '<tr><td colspan="7">No tenants found on the selected floor.</td></tr>';
+          : `<tr><td colspan="${isNovember2026 ? 6 : 7}">No tenants found on the selected floor.</td></tr>`;
 
         document.getElementById('garbageTableBody').innerHTML = rows.length
           ? rows.map((row) => `
@@ -1077,7 +1084,9 @@
       }
 
       function updateWaterRowPreview(rowElement) {
-        const previous = Number(rowElement.querySelector('[data-water-field="previous_reading"]').value || 0);
+        const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
+        const previousInput = rowElement.querySelector('[data-water-field="previous_reading"]');
+        const previous = isNovember2026 || !previousInput ? 0 : Number(previousInput.value || 0);
         const latest = Number(rowElement.querySelector('[data-water-field="latest_reading"]').value || 0);
         const rate = Number(state.ledger.water_rate || 0);
         const consumption = latest - previous;
@@ -1470,12 +1479,14 @@
         if (saveWaterButton) {
           const rowElement = saveWaterButton.closest('tr');
           const userId = saveWaterButton.dataset.userId;
+          const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
+          const previousInput = rowElement.querySelector('[data-water-field="previous_reading"]');
           try {
             await api(`/api/admin/utilities/water/${userId}`, {
               method: 'PUT',
               body: {
                 month_key: state.ledger.month_key,
-                previous_reading: rowElement.querySelector('[data-water-field="previous_reading"]').value,
+                previous_reading: isNovember2026 || !previousInput ? 0 : previousInput.value,
                 latest_reading: rowElement.querySelector('[data-water-field="latest_reading"]').value,
               },
             });

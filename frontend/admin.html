@@ -500,6 +500,7 @@
         tenantFloor: '',
         utilityTab: 'water',
         paymentOpenUserId: null,
+        waterAutoSaveTimers: {},
       };
 
       function escapeHtml(value) {
@@ -1130,6 +1131,48 @@
         }
       }
 
+      async function saveWaterRow(rowElement) {
+        const userId = rowElement?.dataset?.waterUserId || rowElement?.querySelector('.js-save-water')?.dataset?.userId;
+        if (!userId) {
+          return;
+        }
+        const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
+        const previousInput = rowElement.querySelector('[data-water-field="previous_reading"]');
+        const latestInput = rowElement.querySelector('[data-water-field="latest_reading"]');
+        const consumptionInput = rowElement.querySelector('[data-water-field="consumption"]');
+        try {
+          await api(`/api/admin/utilities/water/${userId}`, {
+            method: 'PUT',
+            body: {
+              month_key: state.ledger.month_key,
+              previous_reading: isNovember2026 || !previousInput ? 0 : previousInput.value,
+              latest_reading: latestInput ? latestInput.value : 0,
+              consumption: consumptionInput ? consumptionInput.value : 0,
+            },
+          });
+          await refreshLedger();
+        } catch (error) {
+          setStatus(error.message || 'Unable to save the water reading.', true);
+        }
+      }
+
+      function scheduleWaterAutoSave(rowElement) {
+        if (!rowElement) {
+          return;
+        }
+        const userId = rowElement.dataset.waterUserId || rowElement.querySelector('.js-save-water')?.dataset?.userId;
+        if (!userId) {
+          return;
+        }
+        if (state.waterAutoSaveTimers[userId]) {
+          clearTimeout(state.waterAutoSaveTimers[userId]);
+        }
+        state.waterAutoSaveTimers[userId] = setTimeout(() => {
+          saveWaterRow(rowElement);
+          delete state.waterAutoSaveTimers[userId];
+        }, 350);
+      }
+
       async function refreshLedger() {
         const query = new URLSearchParams({ month: state.ledger.month_key });
         if (state.ledger.selected_floor) {
@@ -1513,26 +1556,8 @@
         const saveWaterButton = event.target.closest('.js-save-water');
         if (saveWaterButton) {
           const rowElement = saveWaterButton.closest('tr');
-          const userId = saveWaterButton.dataset.userId;
-          const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
-          const previousInput = rowElement.querySelector('[data-water-field="previous_reading"]');
-          const latestInput = rowElement.querySelector('[data-water-field="latest_reading"]');
-          const consumptionInput = rowElement.querySelector('[data-water-field="consumption"]');
-          try {
-            await api(`/api/admin/utilities/water/${userId}`, {
-              method: 'PUT',
-              body: {
-                month_key: state.ledger.month_key,
-                previous_reading: isNovember2026 || !previousInput ? 0 : previousInput.value,
-                latest_reading: latestInput ? latestInput.value : 0,
-                consumption: consumptionInput ? consumptionInput.value : 0,
-              },
-            });
-            await refreshLedger();
-            setStatus('Water reading saved and synced to Payment.');
-          } catch (error) {
-            setStatus(error.message || 'Unable to save the water reading.', true);
-          }
+          await saveWaterRow(rowElement);
+          setStatus('Water reading saved and synced to Payment.');
           return;
         }
 
@@ -1572,6 +1597,7 @@
             });
           }
           updateWaterRowPreview(changedRow);
+          scheduleWaterAutoSave(changedRow);
         }
       });
 

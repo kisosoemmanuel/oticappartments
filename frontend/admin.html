@@ -1028,6 +1028,16 @@
         const rows = state.ledger.rows || [];
         const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
         const isSharedWaterFloor = state.session?.selected_property?.id === 'otic-1' && String(state.ledger.selected_floor || '').trim() === '1' && isNovember2026;
+        const waterRateInput = document.getElementById('waterRateInput');
+        const saveWaterRateButton = document.getElementById('saveWaterRateBtn');
+        if (waterRateInput) {
+          waterRateInput.disabled = isNovember2026;
+          waterRateInput.title = isNovember2026 ? 'November 2026 uses the fixed water rule for this month.' : 'Set a new water rate for all tenants';
+        }
+        if (saveWaterRateButton) {
+          saveWaterRateButton.disabled = isNovember2026;
+          saveWaterRateButton.title = isNovember2026 ? 'Switch to another month to edit the rate.' : 'Save the shared water rate for all tenants';
+        }
         const waterHeader = document.querySelector('#waterUtilityPanel thead tr');
         if (waterHeader) {
           waterHeader.innerHTML = isNovember2026
@@ -1091,19 +1101,22 @@
         if (isNovember2026 && !isSharedWaterFloor) {
           const consumptionInput = rowElement.querySelector('[data-water-field="consumption"]');
           const consumption = Number(consumptionInput?.value || 0);
-          const rate = Number(state.ledger.water_rate || 0);
-          const bill = consumption * rate;
-          rowElement.querySelector('.js-water-bill').textContent = formatMoney(bill);
-          const displayCell = rowElement.querySelector('.js-water-consumption');
+          const bill = consumption * Number(state.ledger.water_rate || 0);
+          const displayCell = rowElement.querySelector('.js-water-bill');
           if (displayCell) {
-            displayCell.textContent = `${consumption}`;
+            displayCell.textContent = formatMoney(bill);
+          }
+          const consumptionDisplay = rowElement.querySelector('.js-water-consumption');
+          if (consumptionDisplay) {
+            consumptionDisplay.textContent = `${consumption}`;
           }
           return;
         }
 
         const previousInput = rowElement.querySelector('[data-water-field="previous_reading"]');
+        const latestInput = rowElement.querySelector('[data-water-field="latest_reading"]');
         const previous = isNovember2026 || !previousInput ? 0 : Number(previousInput.value || 0);
-        const latest = Number(rowElement.querySelector('[data-water-field="latest_reading"]').value || 0);
+        const latest = Number(latestInput?.value || 0);
         const rate = Number(state.ledger.water_rate || 0);
         const consumption = latest - previous;
         const bill = consumption * rate;
@@ -1111,7 +1124,10 @@
         if (displayCell) {
           displayCell.textContent = `${consumption}`;
         }
-        rowElement.querySelector('.js-water-bill').textContent = formatMoney(bill);
+        const billDisplay = rowElement.querySelector('.js-water-bill');
+        if (billDisplay) {
+          billDisplay.textContent = formatMoney(bill);
+        }
       }
 
       async function refreshLedger() {
@@ -1500,6 +1516,7 @@
           const userId = saveWaterButton.dataset.userId;
           const isNovember2026 = String(state.ledger.month_key || '').trim() === '2026-11';
           const previousInput = rowElement.querySelector('[data-water-field="previous_reading"]');
+          const latestInput = rowElement.querySelector('[data-water-field="latest_reading"]');
           const consumptionInput = rowElement.querySelector('[data-water-field="consumption"]');
           try {
             await api(`/api/admin/utilities/water/${userId}`, {
@@ -1507,7 +1524,7 @@
               body: {
                 month_key: state.ledger.month_key,
                 previous_reading: isNovember2026 || !previousInput ? 0 : previousInput.value,
-                latest_reading: rowElement.querySelector('[data-water-field="latest_reading"]').value || 0,
+                latest_reading: latestInput ? latestInput.value : 0,
                 consumption: consumptionInput ? consumptionInput.value : 0,
               },
             });

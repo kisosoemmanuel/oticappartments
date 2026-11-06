@@ -259,6 +259,29 @@ async function main() {
     });
     assert.equal(billingApply.response.status, 200, "Selected-tenant billing update should succeed");
 
+    const createdUser = adminUsers.data.users.find((user) => user.tenant_id === createdTenantId);
+    assert(createdUser, "Created tenant should be present with an internal user id");
+
+    const novemberWaterRate = await request(baseUrl, "/api/admin/utilities/water-rate", {
+      method: "POST",
+      cookie: adminCookie,
+      body: { rate: "12.5" },
+    });
+    assert.equal(novemberWaterRate.response.status, 200, "Water rate should save for the property");
+
+    const novemberWaterSave = await request(baseUrl, `/api/admin/utilities/water/${createdUser.id}`, {
+      method: "PUT",
+      cookie: adminCookie,
+      body: {
+        month_key: "2026-11",
+        previous_reading: 0,
+        latest_reading: 0,
+        consumption: 7.5,
+      },
+    });
+    assert.equal(novemberWaterSave.response.status, 200, "November 2026 water consumption should save without meter validation conflicts");
+    assert.equal(Number(novemberWaterSave.data.row?.water_bill || 0), 93.75, "November 2026 water bill should use the consumption value");
+
     const tenantDetail = await request(baseUrl, `/api/admin/tenants/${createdTenantId}/details`, { cookie: adminCookie });
     assert.equal(tenantDetail.response.status, 200, "Admin tenant detail should load");
     assert.equal(Number(tenantDetail.data.tenant.account_balance || 0), 123, "Admin tenant detail should reflect billed balance");

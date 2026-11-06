@@ -2259,19 +2259,33 @@ app.put("/api/admin/utilities/water/:userId", requireAdminSession, asyncHandler(
     return res.status(400).json({ error: error.message });
   }
 
-  const isSharedFloorNovember = monthKey === "2026-11" && String(req.adminProperty.id || "").trim() === "otic-1" && String(user.floor_number || "").trim() === "1";
-  if (isSharedFloorNovember) {
-    const sharedConsumption = consumption > 0 ? consumption : Math.max(latestReading - previousReading, 0);
-    await setScopedAdminSetting(req.adminProperty.id, `shared_water_consumption_${monthKey}_first_floor`, String(sharedConsumption));
-    const floorUsers = (await listUsers({ propertyId: req.adminProperty.id })).filter(
-      (tenant) => String(tenant.floor_number || "").trim() === "1"
-    );
-    for (const floorUser of floorUsers) {
-      await upsertMonthlyWaterReading(floorUser.id, {
+  const isNovemberWaterMonth = monthKey === "2026-11";
+  const isSharedFloorNovember = isNovemberWaterMonth && String(req.adminProperty.id || "").trim() === "otic-1" && String(user.floor_number || "").trim() === "1";
+
+  if (isNovemberWaterMonth) {
+    const normalizedConsumption = consumption > 0 ? consumption : Math.max(latestReading - previousReading, 0);
+    const effectiveConsumption = Number.isFinite(normalizedConsumption) ? normalizedConsumption : 0;
+
+    if (isSharedFloorNovember) {
+      await setScopedAdminSetting(req.adminProperty.id, `shared_water_consumption_${monthKey}_first_floor`, String(effectiveConsumption));
+      const floorUsers = (await listUsers({ propertyId: req.adminProperty.id })).filter(
+        (tenant) => String(tenant.floor_number || "").trim() === "1"
+      );
+      for (const floorUser of floorUsers) {
+        await upsertMonthlyWaterReading(floorUser.id, {
+          property_id: req.adminProperty.id,
+          month_key: monthKey,
+          previous_reading: 0,
+          latest_reading: effectiveConsumption,
+          rate: propertyWaterRate,
+        });
+      }
+    } else {
+      await upsertMonthlyWaterReading(user.id, {
         property_id: req.adminProperty.id,
         month_key: monthKey,
         previous_reading: 0,
-        latest_reading: sharedConsumption,
+        latest_reading: effectiveConsumption,
         rate: propertyWaterRate,
       });
     }
